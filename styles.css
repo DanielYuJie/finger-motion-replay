@@ -570,16 +570,36 @@ h1 {
 
 .replay-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 12px 14px 0;
+  flex-wrap: wrap;
 }
 
 .replay-head h2 {
   margin: 0;
   font-size: 0.95rem;
   font-weight: 600;
+}
+
+.replay-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn.mini {
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  border-radius: 6px;
+}
+
+.btn.mini.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-hover);
 }
 
 .replay-hint {
@@ -630,4 +650,74 @@ h1 {
 .lg.finger {
   border-color: rgba(61, 156, 240, 0.45);
   color: var(--accent);
+}
+
+/* 桥接面板 */
+.bridge-box {
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.bridge-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.bridge-head h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.bridge-state {
+  font-size: 0.72rem;
+  font-family: var(--mono);
+  color: var(--text-dim);
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+
+.bridge-state[data-kind="ok"] {
+  color: var(--success);
+  border-color: rgba(62, 207, 142, 0.45);
+  background: rgba(62, 207, 142, 0.1);
+}
+
+.bridge-state[data-kind="err"] {
+  color: var(--danger);
+  border-color: rgba(240, 113, 120, 0.45);
+  background: rgba(240, 113, 120, 0.1);
+}
+
+.bridge-hint {
+  margin: 8px 0 0;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+
+.bridge-hint code,
+.tips code {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--accent);
+  background: var(--bg);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-actions .btn.mini {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
 }

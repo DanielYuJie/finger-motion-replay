@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MC 机械手搭建方案 · Create 机构版</title>
+<style>
+  :root{
+    --bg:#eef1ee;
+    --paper:#ffffff;
+    --ink:#1b2118;
+    --ink2:#3b443a;
+    --muted:#74806f;
+    --line:#d6ddd3;
+    --grass:#5c8a3c;
+    --brass:#b8892f;
+    --copper:#a8562c;
+    --red:#b3382c;
+    --blue:#3a5f7d;
+    --mono:"Cascadia Code","Consolas",ui-monospace,monospace;
+    --sans:"PingFang SC","Microsoft YaHei",-apple-system,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);
+    font-family:var(--sans);line-height:1.75;font-size:16px;
+  }
+  .wrap{max-width:1020px;margin:0 auto;padding:0 24px 70px;}
+
+  header.top{
+    background:linear-gradient(150deg,#1e2a1c 0%,#2b3a26 50%,#1a2419 100%);
+    color:#eef3ea;padding:60px 0 50px;margin-bottom:0;
+    position:relative;overflow:hidden;
+  }
+  header.top::after{
+    content:"";position:absolute;inset:0;opacity:.22;
+    background-image:linear-gradient(rgba(255,255,255,.07) 1px,transparent 1px),
+                     linear-gradient(90deg,rgba(255,255,255,.07) 1px,transparent 1px);
+    background-size:32px 32px;
+  }
+  .wrap-h{max-width:1020px;margin:0 auto;padding:0 24px;position:relative;z-index:2;}
+  .tag{
+    display:inline-block;font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;
+    color:#c9a961;border:1px solid rgba(201,169,97,.4);border-radius:999px;
+    padding:6px 14px;background:rgba(201,169,97,.08);font-weight:600;
+  }
+  header.top h1{
+    font-size:clamp(1.9rem,4.6vw,3rem);margin:22px 0 14px;line-height:1.2;
+    font-weight:800;letter-spacing:-.01em;
+  }
+  header.top h1 span{color:#c9a961;}
+  header.top p{color:rgba(238,243,234,.72);max-width:64ch;margin:0;}
+  .hmeta{display:flex;flex-wrap:wrap;gap:28px;margin-top:30px;padding-top:22px;border-top:1px solid rgba(255,255,255,.12);}
+  .hmeta div .k{font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:rgba(238,243,234,.45);}
+  .hmeta div .v{font-family:var(--mono);font-size:.92rem;margin-top:4px;}
+
+  section{padding:52px 0 0;}
+  .shead{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;}
+  .snum{font-family:var(--mono);font-size:1.05rem;color:var(--brass);font-weight:700;}
+  h2{margin:0;font-size:clamp(1.3rem,2.8vw,1.7rem);font-weight:800;letter-spacing:-.01em;}
+  .ssub{color:var(--muted);font-size:.84rem;margin:0 0 22px;}
+  h3{font-size:1.05rem;margin:30px 0 12px;font-weight:700;}
+  p{margin:0 0 15px;color:var(--ink2);}
+
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:22px;box-shadow:0 6px 22px rgba(27,33,24,.06);}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  @media(max-width:820px){.grid2,.grid3{grid-template-columns:1fr;}}
+
+  .diagram{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:20px;margin:24px 0;box-shadow:0 6px 22px rgba(27,33,24,.06);}
+  .diagram svg{width:100%;height:auto;display:block;}
+  .cap{font-size:.8rem;color:var(--muted);font-family:var(--mono);margin-top:12px;}
+
+  table{width:100%;border-collapse:collapse;font-size:.88rem;background:var(--paper);border-radius:12px;overflow:hidden;box-shadow:0 6px 22px rgba(27,33,24,.06);}
+  th,td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{background:#e7ebe4;font-size:.76rem;letter-spacing:.05em;text-transform:uppercase;font-weight:700;}
+  tr:last-child td{border-bottom:0;}
+  code{font-family:var(--mono);font-size:.83rem;color:var(--copper);}
+
+  ul{margin:0 0 6px;padding-left:20px;color:var(--ink2);font-size:.92rem;}
+  li{margin-bottom:6px;}
+
+  .callout{
+    border-left:3px solid var(--brass);background:rgba(184,137,47,.08);
+    border-radius:0 10px 10px 0;padding:14px 18px;margin:22px 0;font-size:.92rem;color:var(--ink2);
+  }
+  .callout.warn{border-color:var(--red);background:rgba(179,56,44,.07);}
+  .callout.ok{border-color:var(--grass);background:rgba(92,138,60,.09);}
+
+  .steps{counter-reset:s;display:flex;flex-direction:column;gap:12px;margin-top:8px;}
+  .step{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:16px 18px 16px 56px;position:relative;}
+  .step::before{
+    counter-increment:s;content:counter(s);
+    position:absolute;left:16px;top:16px;width:26px;height:26px;border-radius:50%;
+    background:var(--grass);color:#fff;display:flex;align-items:center;justify-content:center;
+    font-size:.82rem;font-weight:700;font-family:var(--mono);
+  }
+  .step b{display:block;font-size:.95rem;margin-bottom:4px;}
+  .step span{font-size:.87rem;color:var(--muted);}
+
+  footer.f{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:.78rem;}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap-h">
+    <span class="tag">Minecraft · Create Mod · Mechanism Design</span>
+    <h1>用 MC 搭一只<span>机械硬件手</span><br/>控制逻辑预演方案</h1>
+    <p>
+      以 Create 模组的轴承与绳索滑轮模拟关节与腱绳，用齿轮变速与序列换挡控制弯曲角度，
+      在方块世界里先跑通「指令 → 动作」的完整流程，再映射到真实舵机与腱绳手。
+    </p>
+    <div class="hmeta">
+      <div><div class="k">定位</div><div class="v">动作逻辑验证</div></div>
+      <div><div class="k">核心机构</div><div class="v">机械轴承 + 绳索滑轮</div></div>
+      <div><div class="k">自由度</div><div class="v">5 DoF（简化）/ 15 DoF（完整）</div></div>
+      <div><div class="k">尺度</div><div class="v">1 方块 = 1 米</div></div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<!-- 1 -->
+<section>
+  <div class="shead"><span class="snum">01</span><h2>能验证什么，不能验证什么</h2></div>
+  <p class="ssub">SCOPE</p>
+
+  <div class="grid2">
+    <div class="card">
+      <h3 style="margin-top:0">✅ 适合验证</h3>
+      <ul>
+        <li>五指的<b>动作时序</b>：哪根先动、间隔多久</li>
+        <li><b>控制链路</b>：主端指令 → 各指独立响应</li>
+        <li>抓握姿态组合：握拳、捏取、指向、对掌</li>
+        <li>红石信号分配、互锁与复位逻辑</li>
+        <li>多人联机演示与流程讲解</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">❌ 不适合验证</h3>
+      <ul>
+        <li>连续角度与真实关节角（方块旋转是离散步进）</li>
+        <li>腱绳张力、抓持力、摩擦与疲劳</li>
+        <li>真实尺寸与干涉（1 方块 1 米的尺度失真）</li>
+        <li>舵机扭矩、电流与发热</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <b>结论：</b>MC 用来把「控制与动作流程」跑通，机械尺寸与受力仍需 Three.js / URDF / MuJoCo 或实物验证。
+    两者互补，不替代。
+  </div>
+</section>
+
+<!-- 2 -->
+<section>
+  <div class="shead"><span class="snum">02</span><h2>整手布局（俯视）</h2></div>
+  <p class="ssub">TOP VIEW · 1 格 = 1 米</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 1000 470" xmlns="http://www.w3.org/2000/svg" font-family="PingFang SC, Microsoft YaHei, sans-serif">
+      <rect width="1000" height="470" fill="#fbfcfa"/>
+
+      <!-- grid -->
+      <g stroke="#e3e8e0" stroke-width="1">
+        <path d="M60 60 H940 M60 110 H940 M60 160 H940 M60 210 H940 M60 260 H940 M60 310 H940 M60 360 H940"/>
+        <path d="M60 60 V360 M110 60 V360 M160 60 V360 M210 60 V360 M260 60 V360 M310 60 V360 M360 60 V360 M410 60 V360 M460 60 V360 M510 60 V360 M560 60 V360 M610 60 V360 M660 60 V360 M710 60 V360 M760 60 V360 M810 60 V360 M860 60 V360 M910 60 V360"/>
+      </g>
+
+      <!-- palm -->
+      <rect x="300" y="180" width="400" height="160" rx="8" fill="#dfe6d9" stroke="#8fa285" stroke-width="2"/>
+      <text x="500" y="268" font-size="17" fill="#5c6b58" text-anchor="middle" font-weight="700">掌心平台 8 × 3 格</text>
+      <text x="500" y="292" font-size="12" fill="#8fa285" text-anchor="middle">（内嵌动力轴与齿轮分配）</text>
+
+      <!-- fingers -->
+      <g>
+        <!-- index -->
+        <rect x="320" y="110" width="60" height="70" fill="#e8ded0" stroke="#b8892f" stroke-width="2" rx="5"/>
+        <circle cx="350" cy="180" r="9" fill="#b8892f"/>
+        <text x="350" y="98" font-size="12.5" fill="#7a6135" text-anchor="middle">食指</text>
+        <text x="350" y="150" font-size="11" fill="#a08a5e" text-anchor="middle">轴承</text>
+
+        <!-- middle -->
+        <rect x="410" y="86" width="60" height="94" fill="#e8ded0" stroke="#b8892f" stroke-width="2" rx="5"/>
+        <circle cx="440" cy="180" r="9" fill="#b8892f"/>
+        <text x="440" y="74" font-size="12.5" fill="#7a6135" text-anchor="middle">中指</text>
+        <text x="440" y="136" font-size="11" fill="#a08a5e" text-anchor="middle">轴承</text>
+
+        <!-- ring -->
+        <rect x="500" y="96" width="60" height="84" fill="#e8ded0" stroke="#b8892f" stroke-width="2" rx="5"/>
+        <circle cx="530" cy="180" r="9" fill="#b8892f"/>
+        <text x="530" y="84" font-size="12.5" fill="#7a6135" text-anchor="middle">无名指</text>
+
+        <!-- pinky -->
+        <rect x="590" y="124" width="58" height="56" fill="#e8ded0" stroke="#b8892f" stroke-width="2" rx="5"/>
+        <circle cx="619" cy="180" r="9" fill="#b8892f"/>
+        <text x="619" y="112" font-size="12.5" fill="#7a6135" text-anchor="middle">小指</text>
+
+        <!-- thumb -->
+        <rect x="222" y="230" width="78" height="58" fill="#e8ded0" stroke="#b8892f" stroke-width="2" rx="5" transform="rotate(-18 222 230)"/>
+        <circle cx="300" cy="248" r="9" fill="#b8892f"/>
+        <text x="228" y="212" font-size="12.5" fill="#7a6135" text-anchor="middle">拇指</text>
+      </g>
+
+      <!-- rope pulleys -->
+      <g fill="#3a5f7d">
+        <circle cx="350" cy="205" r="6"/><circle cx="440" cy="205" r="6"/>
+        <circle cx="530" cy="205" r="6"/><circle cx="619" cy="205" r="6"/>
+      </g>
+      <text x="500" y="228" font-size="11.5" fill="#3a5f7d" text-anchor="middle" font-family="monospace">○ 绳索滑轮（腱绳）</text>
+
+      <!-- wrist / power -->
+      <rect x="380" y="348" width="240" height="72" rx="10" fill="#e3e9df" stroke="#5c8a3c" stroke-width="2"/>
+      <text x="500" y="378" font-size="14" fill="#40602c" text-anchor="middle" font-weight="700">腕部动力舱</text>
+      <text x="500" y="400" font-size="11.5" fill="#7d8f70" text-anchor="middle" font-family="monospace">转速控制器 · 离合器 · 齿轮分配</text>
+
+      <!-- shaft -->
+      <line x1="500" y1="340" x2="500" y2="348" stroke="#5c8a3c" stroke-width="6"/>
+
+      <!-- control panel -->
+      <rect x="700" y="120" width="200" height="210" rx="10" fill="#f3ece0" stroke="#a8562c" stroke-width="2"/>
+      <text x="800" y="148" font-size="14" fill="#8a4623" text-anchor="middle" font-weight="700">控制台</text>
+      <g font-size="12" fill="#6b5540">
+        <text x="726" y="180">■ 五指模拟拉杆 ×5</text>
+        <text x="726" y="206">■ 主离合（急停）</text>
+        <text x="726" y="232">■ 反向 / 复位</text>
+        <text x="726" y="258">■ 序列换挡脉冲</text>
+        <text x="726" y="284">■ 红石链路接收</text>
+        <text x="726" y="310">■ 电脑（CC）可选</text>
+      </g>
+
+      <!-- link -->
+      <path d="M700 225 C660 225 660 300 622 330" stroke="#a8562c" stroke-width="2" fill="none" stroke-dasharray="6 4"/>
+      <text x="700" y="352" font-size="11" fill="#a8562c" text-anchor="middle" font-family="monospace">红石链路</text>
+
+      <text x="60" y="428" font-size="11.5" fill="#74806f" font-family="monospace">图 1 · 整手布局：掌 8×3，四指节 5 格长，拇指侧置，腕部集中动力与传动</text>
+    </svg>
+  </div>
+</section>
+
+<!-- 3 -->
+<section>
+  <div class="shead"><span class="snum">03</span><h2>单指机构（侧剖）</h2></div>
+  <p class="ssub">FINGER MECHANISM · 对应真实腱绳手</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 1000 420" xmlns="http://www.w3.org/2000/svg" font-family="PingFang SC, Microsoft YaHei, sans-serif">
+      <rect width="1000" height="420" fill="#fbfcfa"/>
+
+      <!-- palm base -->
+      <rect x="70" y="250" width="150" height="110" rx="8" fill="#dfe6d9" stroke="#8fa285" stroke-width="2"/>
+      <text x="145" y="312" font-size="12.5" fill="#5c6b58" text-anchor="middle">掌部</text>
+
+      <!-- bearing at knuckle -->
+      <circle cx="250" cy="280" r="26" fill="#f0e4cc" stroke="#b8892f" stroke-width="3"/>
+      <circle cx="250" cy="280" r="9" fill="#b8892f"/>
+      <text x="250" y="332" font-size="12" fill="#8a7440" text-anchor="middle">机械轴承</text>
+      <text x="250" y="350" font-size="11" fill="#a08a5e" text-anchor="middle" font-family="monospace">MCP 关节</text>
+
+      <!-- finger segments (3) -->
+      <g stroke="#a08a5e" stroke-width="2" fill="#e8ded0">
+        <rect x="272" y="256" width="150" height="46" rx="8"/>
+        <rect x="418" y="256" width="130" height="46" rx="8"/>
+        <rect x="544" y="256" width="110" height="46" rx="8"/>
+      </g>
+      <text x="347" y="285" font-size="12" fill="#7a6135" text-anchor="middle">近节</text>
+      <text x="483" y="285" font-size="12" fill="#7a6135" text-anchor="middle">中节</text>
+      <text x="599" y="285" font-size="12" fill="#7a6135" text-anchor="middle">远节</text>
+
+      <!-- joints -->
+      <g fill="#b8892f">
+        <circle cx="414" cy="279" r="12"/><circle cx="540" cy="279" r="11"/>
+      </g>
+      <text x="414" y="232" font-size="11" fill="#8a7440" text-anchor="middle" font-family="monospace">PIP</text>
+      <text x="540" y="232" font-size="11" fill="#8a7440" text-anchor="middle" font-family="monospace">DIP</text>
+
+      <!-- finger block markers -->
+      <g fill="#d8cdb9" stroke="#c3b49b" stroke-width="1">
+        <rect x="284" y="264" width="30" height="30"/><rect x="316" y="264" width="30" height="30"/><rect x="348" y="264" width="30" height="30"/><rect x="380" y="264" width="30" height="30"/>
+        <rect x="430" y="264" width="30" height="30"/><rect x="462" y="264" width="30" height="30"/><rect x="494" y="264" width="30" height="30"/>
+        <rect x="556" y="264" width="30" height="30"/><rect x="588" y="264" width="30" height="30"/><rect x="620" y="264" width="30" height="30"/>
+      </g>
+
+      <!-- rope pulley / tendon -->
+      <circle cx="200" cy="180" r="22" fill="#e6eef4" stroke="#3a5f7d" stroke-width="3"/>
+      <circle cx="200" cy="180" r="7" fill="#3a5f7d"/>
+      <text x="200" y="146" font-size="12" fill="#3a5f7d" text-anchor="middle">绳索滑轮</text>
+      <text x="200" y="224" font-size="11" fill="#5b83a3" text-anchor="middle" font-family="monospace">模拟腱绳</text>
+      <path d="M200 202 L200 250 M222 180 C280 168 420 150 650 150 L650 256"
+            stroke="#3a5f7d" stroke-width="2" fill="none"/>
+
+      <!-- servo analog -->
+      <rect x="86" y="150" width="80" height="66" rx="7" fill="#e9e3d6" stroke="#a8562c" stroke-width="2"/>
+      <text x="126" y="180" font-size="12" fill="#8a4623" text-anchor="middle">动力</text>
+      <text x="126" y="198" font-size="11" fill="#a8825f" text-anchor="middle" font-family="monospace">≙ 舵机</text>
+      <line x1="166" y1="183" x2="178" y2="182" stroke="#a8562c" stroke-width="2"/>
+
+      <!-- rotation arrow -->
+      <path d="M296 210 A60 60 0 0 1 380 216" stroke="#b3382c" stroke-width="2.5" fill="none" marker-end="url(#a3)"/>
+      <defs>
+        <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10" fill="none" stroke="#b3382c" stroke-width="1.6"/>
+        </marker>
+      </defs>
+      <text x="330" y="196" font-size="11.5" fill="#b3382c" font-family="monospace">弯曲 θ</text>
+
+      <!-- return -->
+      <text x="700" y="330" font-size="12" fill="#5c6b58">回位：关掉动力后由重力 / 反向脉冲复位</text>
+      <text x="700" y="354" font-size="12" fill="#5c6b58">对应实物：橡皮筋 / 弹簧</text>
+
+      <text x="70" y="398" font-size="11.5" fill="#74806f" font-family="monospace">图 2 · 单指机构：轴承承担弯曲，绳索滑轮模拟腱绳牵拉，动力位对应舵机</text>
+    </svg>
+  </div>
+
+  <h3>两个实现档位</h3>
+  <table>
+    <thead>
+      <tr><th>档位</th><th>每指机构</th><th>自由度</th><th>用料量级</th><th>建议</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><b>简化版</b></td>
+        <td>1 个机械轴承（指根）+ 1 个绳索滑轮</td>
+        <td>5 DoF</td>
+        <td>轴承 ×5、滑轮 ×5</td>
+        <td><b>先做这个</b>：一天可搭完，逻辑完整</td>
+      </tr>
+      <tr>
+        <td><b>完整版</b></td>
+        <td>每节 1 轴承（近/中/远），三层嵌套</td>
+        <td>15 DoF</td>
+        <td>轴承 ×15、换挡 ×15</td>
+        <td>轴承嵌套易卡，仅追求视觉震撼时做</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 4 -->
+<section>
+  <div class="shead"><span class="snum">04</span><h2>控制与信号分配</h2></div>
+  <p class="ssub">CONTROL ARCHITECTURE</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 1000 360" xmlns="http://www.w3.org/2000/svg" font-family="PingFang SC, Microsoft YaHei, sans-serif">
+      <rect width="1000" height="360" fill="#fbfcfa"/>
+      <defs>
+        <marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10" fill="none" stroke="#5c8a3c" stroke-width="1.8"/>
+        </marker>
+      </defs>
+
+      <!-- power -->
+      <rect x="30" y="130" width="150" height="90" rx="10" fill="#e9f0e4" stroke="#5c8a3c" stroke-width="2"/>
+      <text x="105" y="166" font-size="13" font-weight="700" fill="#40602c" text-anchor="middle">动力源</text>
+      <text x="105" y="188" font-size="11.5" fill="#7d8f70" text-anchor="middle">风车 / 蒸汽机</text>
+      <text x="105" y="206" font-size="11" fill="#7d8f70" text-anchor="middle" font-family="monospace">创造马达(测试)</text>
+
+      <!-- speed controller -->
+      <rect x="222" y="122" width="166" height="106" rx="10" fill="#fff" stroke="#b8892f" stroke-width="2"/>
+      <text x="305" y="154" font-size="13" font-weight="700" fill="#7a6135" text-anchor="middle">转速控制器</text>
+      <text x="305" y="176" font-size="11" fill="#a08a5e" text-anchor="middle">模拟拉杆定速</text>
+      <text x="305" y="196" font-size="11" fill="#a08a5e" text-anchor="middle">决定动作快慢</text>
+      <text x="305" y="214" font-size="10.5" fill="#b8892f" text-anchor="middle" font-family="monospace">≙ PWM 脉宽</text>
+
+      <!-- clutch -->
+      <rect x="430" y="122" width="150" height="106" rx="10" fill="#fff" stroke="#a8562c" stroke-width="2"/>
+      <text x="505" y="154" font-size="13" font-weight="700" fill="#8a4623" text-anchor="middle">离合器</text>
+      <text x="505" y="176" font-size="11" fill="#a8825f" text-anchor="middle">总动力通断</text>
+      <text x="505" y="196" font-size="11" fill="#a8825f" text-anchor="middle">急停/待机</text>
+      <text x="505" y="214" font-size="10.5" fill="#a8562c" text-anchor="middle" font-family="monospace">≙ 使能信号</text>
+
+      <!-- gearshifts -->
+      <rect x="622" y="60" width="170" height="230" rx="10" fill="#fff" stroke="#3a5f7d" stroke-width="2"/>
+      <text x="707" y="90" font-size="13" font-weight="700" fill="#33566f" text-anchor="middle">序列换挡 ×5</text>
+      <g font-size="11.5" fill="#5b83a3" font-family="monospace">
+        <text x="642" y="120">F1 食指</text>
+        <text x="642" y="152">F2 中指</text>
+        <text x="642" y="184">F3 无名指</text>
+        <text x="642" y="216">F4 小指</text>
+        <text x="642" y="248">F5 拇指</text>
+      </g>
+      <text x="707" y="276" font-size="10.5" fill="#3a5f7d" text-anchor="middle">脉冲一次 = 转固定角度</text>
+
+      <!-- fingers -->
+      <rect x="838" y="60" width="132" height="230" rx="10" fill="#e8ded0" stroke="#b8892f" stroke-width="2"/>
+      <text x="904" y="90" font-size="13" font-weight="700" fill="#7a6135" text-anchor="middle">五指轴承</text>
+      <g font-size="11.5" fill="#a08a5e" font-family="monospace">
+        <text x="858" y="120">● 手指1</text>
+        <text x="858" y="152">● 手指2</text>
+        <text x="858" y="184">● 手指3</text>
+        <text x="858" y="216">● 手指4</text>
+        <text x="858" y="248">● 拇指</text>
+      </g>
+
+      <line x1="180" y1="175" x2="216" y2="175" stroke="#5c8a3c" stroke-width="2" marker-end="url(#a4)"/>
+      <line x1="388" y1="175" x2="424" y2="175" stroke="#5c8a3c" stroke-width="2" marker-end="url(#a4)"/>
+      <line x1="580" y1="175" x2="616" y2="175" stroke="#5c8a3c" stroke-width="2" marker-end="url(#a4)"/>
+      <line x1="792" y1="175" x2="832" y2="175" stroke="#5c8a3c" stroke-width="2" marker-end="url(#a4)"/>
+
+      <text x="30" y="320" font-size="11.5" fill="#74806f" font-family="monospace">图 3 · 动力链：动力源 →（定速）→（通断）→ 五指换挡 → 轴承；红石脉冲决定每指转角</text>
+    </svg>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3 style="margin-top:0">纯红石替代（无 Create）</h3>
+      <ul>
+        <li>粘液块 + 活塞：两态夹爪（开 / 合）</li>
+        <li>观察者 + T 触发器：单脉冲步进</li>
+        <li>红石中继器调延时：模拟动作间隔</li>
+        <li>优点：原版即可；缺点：只有两态，无角度</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">ComputerCraft 进阶（可选）</h3>
+      <ul>
+        <li>CC 电脑 + 红石 I/O 输出 5 路信号</li>
+        <li>Lua 脚本定义姿态：握拳 / 捏取 / 指向</li>
+        <li>可读取聊天或文件指令，模拟主端下发</li>
+        <li>未来与实物通讯协议同构：<code>S,指,角</code></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout ok">
+    <b>与实物对齐：</b>把「换挡脉冲数」当作舵机角度，「转速控制器」当作 PWM 频率，
+    这套逻辑可直接换成 ESP32 + SG90 的控制代码。
+  </div>
+</section>
+
+<!-- 5 -->
+<section>
+  <div class="shead"><span class="snum">05</span><h2>动作时序表</h2></div>
+  <p class="ssub">POSE SEQUENCE</p>
+
+  <table>
+    <thead>
+      <tr><th>姿态</th><th>动作顺序</th><th>延时</th><th>对应实物</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><b>张开</b></td>
+        <td>全部换挡反向脉冲 ×1，回位</td>
+        <td>0 tick</td>
+        <td>弹簧回位至初始角</td>
+      </tr>
+      <tr>
+        <td><b>握拳</b></td>
+        <td>中指 → 无名指 → 食指 → 小指 → 拇指</td>
+        <td>每指间隔 4 tick</td>
+        <td>依次收拢，防打架</td>
+      </tr>
+      <tr>
+        <td><b>捏取</b></td>
+        <td>拇指 + 食指同时脉冲 ×2，其余不动</td>
+        <td>同步</td>
+        <td>两指对捏轻物</td>
+      </tr>
+      <tr>
+        <td><b>指向</b></td>
+        <td>仅食指伸直，其余收拢</td>
+        <td>先收后指，间隔 6 tick</td>
+        <td>指示动作</td>
+      </tr>
+      <tr>
+        <td><b>对掌</b></td>
+        <td>小指 + 拇指相向，形成环</td>
+        <td>同步</td>
+        <td>拇指对掌测试</td>
+      </tr>
+      <tr>
+        <td><b>急停</b></td>
+        <td>主离合断开</td>
+        <td>立即</td>
+        <td>断电保位</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 6 -->
+<section>
+  <div class="shead"><span class="snum">06</span><h2>搭建步骤</h2></div>
+  <p class="ssub">BUILD ORDER</p>
+
+  <div class="steps">
+    <div class="step"><b>定基础与动力舱</b><span>先铺掌部平台 8×3，下方放转速控制器、离合器与动力源；用创造马达最快，正式版换风车/蒸汽机。</span></div>
+    <div class="step"><b>装指根轴承</b><span>在掌前缘按食指—小指位置放 5 个机械轴承（拇指侧置偏转约 20°），确认转动无遮挡。</span></div>
+    <div class="step"><b>接指节与关节</b><span>每指用 5 格方块构成三节，节间放小型轴承或直接用整段；先做一根手指试转。</span></div>
+    <div class="step"><b>加绳索滑轮</b><span>每指背部布 1 个绳索滑轮并连绳至指尖，模拟腱绳牵拉；调节初始长度。</span></div>
+    <div class="step"><b>接序列换挡</b><span>为每个轴承接换挡机构，脉冲一次转固定角；用红石链路连到控制台。</span></div>
+    <div class="step"><b>做控制台</b><span>5 个模拟拉杆 + 主离合 + 反向；墙面贴 Nixie 管显示状态，便于演示讲解。</span></div>
+    <div class="step"><b>跑姿态序列</b><span>按第 5 节表格调延时，依次验证握拳、捏取、指向、对掌。</span></div>
+    <div class="step"><b>记录与映射</b><span>把每个姿态的脉冲数、延时记下来，作为实物舵机角度与动作间隔的初值。</span></div>
+  </div>
+</section>
+
+<div class="callout" style="margin-top:36px">
+  <b>尺度提醒：</b>1 方块 = 1 米，所以这只手会是「巨型机械手」。若想接近真人尺寸观感，
+  可用<b>小方块模组（Chisels &amp; Bits / LittleTiles）</b>把比例缩到 1/4，或接受它作为「演示装置」的定位。
+</div>
+
+<footer class="f">
+  MC 机械手搭建方案 · Create 机构版 · 控制逻辑预演 · 可迁移至 ESP32 + 舵机实物实现
+</footer>
+
+</div>
+</body>
+</html>

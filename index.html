@@ -3,228 +3,529 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>手指运动采集 · 视觉关节点</title>
-  <link rel="stylesheet" href="styles.css" />
+  <title>低成本 3D 打印机械手 · 图纸与交付方案</title>
+  <link rel="stylesheet" href="hand-design.css" />
 </head>
 <body>
-  <div class="app">
-    <header class="header">
-      <div class="brand">
-        <div class="brand-mark" aria-hidden="true"></div>
-        <div>
-          <h1>手指运动采集</h1>
-          <p class="sub">摄像头 · 手部关节点 · 关节角</p>
+  <div class="page">
+    <!-- Hero -->
+    <header class="hero">
+      <div class="hero-card">
+        <div class="badge-row">
+          <span class="badge hot">可直接给淘宝 3D 打印商家</span>
+          <span class="badge">欠驱动腱绳</span>
+          <span class="badge">PLA 打印</span>
+          <span class="badge">约 38 个零件</span>
+        </div>
+        <h1>五指欠驱动机械手<br/>低成本 3D 打印交付包</h1>
+        <p class="lead">
+          面向教学演示与遥操作从端：结构可单色 PLA 打印、标准紧固件、SG90/MG90S 舵机腱绳驱动。
+          本页含零件图、装配示意、BOM 与<strong>可复制的淘宝下单文案</strong>。
+        </p>
+        <div class="stat-grid">
+          <div class="stat"><b>~¥85</b><span>打印+外购估价</span></div>
+          <div class="stat"><b>5 DoF</b><span>拇指+四指腱绳</span></div>
+          <div class="stat"><b>~48h</b><span>桌面打印总时长</span></div>
         </div>
       </div>
-      <div class="status" id="status" data-state="idle">
-        <span class="dot"></span>
-        <span id="statusText">未开启</span>
-      </div>
+      <nav class="toc">
+        <h2>目录</h2>
+        <ol>
+          <li><a href="#overview">方案总览与技术路线</a></li>
+          <li><a href="#viewer">3D 结构演示</a></li>
+          <li><a href="#drawings">零件图纸（打印用）</a></li>
+          <li><a href="#bom">BOM 物料清单</a></li>
+          <li><a href="#print">打印参数建议</a></li>
+          <li><a href="#taobao">淘宝商家下单方案（复制即用）</a></li>
+          <li><a href="#assembly">装配与验收</a></li>
+        </ol>
+      </nav>
     </header>
 
-    <main class="main">
-      <section class="stage">
-        <div class="viewport" id="viewport">
-          <video id="video" playsinline autoplay muted></video>
-          <canvas id="overlay"></canvas>
-          <div class="placeholder" id="placeholder">
-            <div class="placeholder-icon" aria-hidden="true">
-              <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-                <rect x="6" y="14" width="28" height="20" rx="4" stroke="currentColor" stroke-width="2"/>
-                <path d="M34 20l8-4v16l-8-4V20z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-                <circle cx="16" cy="24" r="4" stroke="currentColor" stroke-width="2"/>
-              </svg>
-            </div>
-            <p>点击「开启摄像头」开始采集</p>
-            <p class="hint">将手放入画面，即可看到关节点与关节角</p>
-          </div>
-          <div class="badge" id="handBadge" hidden>已检测到手</div>
+    <!-- Overview -->
+    <section class="block" id="overview">
+      <div class="section-head">
+        <h2>1. 方案总览</h2>
+        <span class="tag">主动作：五指屈伸 · 可扩展侧摆</span>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <div class="n">1</div>
+          <h4>欠驱动手指</h4>
+          <p>近节/中节/远节，弹簧回位；单腱绳拉动三节，自适应抓握。</p>
         </div>
+        <div class="step">
+          <div class="n">2</div>
+          <h4>掌部骨架</h4>
+          <p>左右夹板 + 指座；舵机舱位于掌心/腕部，便于配重。</p>
+        </div>
+        <div class="step">
+          <div class="n">3</div>
+          <h4>腱绳传动</h4>
+          <p>凯夫拉线/编织线穿过导管，行程约 12–16mm 对应全握。</p>
+        </div>
+        <div class="step">
+          <div class="n">4</div>
+          <h4>电子控制</h4>
+          <p>ESP32/Arduino + PCA9685，PWM 映射关节角，可接现有视觉主端。</p>
+        </div>
+      </div>
+      <div class="note">
+        <strong>设计目标：</strong>在保证可打印、可装配的前提下，把成本压到「学生/个人开发者」可接受范围；
+        精度对标演示级，不追求科研级六维力控。后续可在指尖加应变/霍尔传感器做反馈。
+      </div>
+    </section>
 
-        <div class="meta">
-          <div class="meta-item">
-            <span class="label">分辨率</span>
-            <span class="value" id="resolution">—</span>
+    <!-- 3D Viewer -->
+    <section class="block" id="viewer">
+      <div class="section-head">
+        <h2>2. 3D 结构演示</h2>
+        <span class="tag">拖拽旋转 · 滚轮缩放 · 双击复位</span>
+      </div>
+      <div class="stage-wrap">
+        <canvas id="handCanvas"></canvas>
+        <div class="stage-overlay">
+          <span class="pill">
+            视角
+            <button type="button" id="btnViewIso">等轴</button>
+            <button type="button" id="btnViewFront">正视</button>
+            <button type="button" id="btnViewSide">侧视</button>
+            <button type="button" id="btnGrip">握拳/张开</button>
+            <button type="button" id="btnExplode">分解</button>
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Drawings -->
+    <section class="block" id="drawings">
+      <div class="section-head">
+        <h2>3. 零件图纸（关键件）</h2>
+        <span class="tag">单位 mm · 供打印商家核对尺寸</span>
+      </div>
+      <div class="draw-grid">
+
+        <!-- Palm -->
+        <article class="draw-card">
+          <header>
+            <span>掌部侧板</span>
+            <code>PALM-01</code>
+          </header>
+          <div class="svg-wrap">
+            <svg viewBox="0 0 520 320" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, sans-serif">
+              <rect x="0" y="0" width="520" height="320" fill="#faf8f4"/>
+              <!-- palm outline -->
+              <path d="M120,40 L380,40 L400,80 L400,240 L360,280 L140,280 L100,240 L100,80 Z"
+                    fill="#dfe8f0" stroke="#1c2430" stroke-width="2.2"/>
+              <!-- finger sockets -->
+              <rect x="140" y="28" width="48" height="28" rx="4" fill="#fff" stroke="#1c2430" stroke-width="1.8"/>
+              <rect x="198" y="24" width="48" height="32" rx="4" fill="#fff" stroke="#1c2430" stroke-width="1.8"/>
+              <rect x="256" y="24" width="48" height="32" rx="4" fill="#fff" stroke="#1c2430" stroke-width="1.8"/>
+              <rect x="314" y="28" width="48" height="28" rx="4" fill="#fff" stroke="#1c2430" stroke-width="1.8"/>
+              <!-- thumb mount -->
+              <path d="M100,120 L70,150 L70,200 L100,210" fill="#dfe8f0" stroke="#1c2430" stroke-width="2"/>
+              <!-- servo pocket -->
+              <rect x="160" y="120" width="200" height="90" rx="6" fill="#fff" stroke="#3d6b8c" stroke-width="1.6" stroke-dasharray="5 3"/>
+              <text x="170" y="150" font-size="12" fill="#3d6b8c">舵机舱 40×32×12</text>
+              <!-- holes -->
+              <circle cx="130" cy="100" r="4" fill="#1c2430"/>
+              <circle cx="130" cy="180" r="4" fill="#1c2430"/>
+              <circle cx="370" cy="100" r="4" fill="#1c2430"/>
+              <circle cx="370" cy="180" r="4" fill="#1c2430"/>
+              <text x="118" y="115" font-size="10" fill="#5c6b7a">M3</text>
+              <!-- dims -->
+              <line x1="100" y1="300" x2="400" y2="300" stroke="#c45c26" stroke-width="1"/>
+              <text x="235" y="315" font-size="12" fill="#c45c26">96</text>
+              <line x1="430" y1="40" x2="430" y2="280" stroke="#c45c26" stroke-width="1"/>
+              <text x="438" y="165" font-size="12" fill="#c45c26">82</text>
+              <text x="120" y="55" font-size="11" fill="#5c6b7a">指座间距 18</text>
+            </svg>
           </div>
-          <div class="meta-item">
-            <span class="label">帧率</span>
-            <span class="value" id="fps">—</span>
+          <footer>材料 PLA · 层高 0.2 · 填充 30% · 壁厚 ≥3 条线 · 竖放打印减少支撑</footer>
+        </article>
+
+        <!-- Finger segment -->
+        <article class="draw-card">
+          <header>
+            <span>手指节（近节）</span>
+            <code>FPRX-02</code>
+          </header>
+          <div class="svg-wrap">
+            <svg viewBox="0 0 520 320" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, sans-serif">
+              <rect x="0" y="0" width="520" height="320" fill="#faf8f4"/>
+              <!-- side view finger -->
+              <rect x="80" y="130" width="340" height="60" rx="18" fill="#dfe8f0" stroke="#1c2430" stroke-width="2.2"/>
+              <!-- hinge -->
+              <circle cx="110" cy="160" r="18" fill="#fff" stroke="#1c2430" stroke-width="2"/>
+              <circle cx="110" cy="160" r="6" fill="#1c2430"/>
+              <circle cx="390" cy="160" r="16" fill="#fff" stroke="#1c2430" stroke-width="2"/>
+              <circle cx="390" cy="160" r="5" fill="#1c2430"/>
+              <!-- tendon channel -->
+              <line x1="130" y1="150" x2="370" y2="150" stroke="#3d6b8c" stroke-width="3" stroke-dasharray="6 3"/>
+              <text x="150" y="145" font-size="11" fill="#3d6b8c">腱绳槽 Ø2.5</text>
+              <!-- spring pocket -->
+              <rect x="200" y="175" width="50" height="22" rx="4" fill="#fff" stroke="#c45c26" stroke-width="1.5"/>
+              <text x="188" y="210" font-size="10" fill="#c45c26">回位弹簧槽</text>
+              <!-- dims -->
+              <line x1="80" y1="230" x2="420" y2="230" stroke="#c45c26" stroke-width="1"/>
+              <text x="235" y="248" font-size="12" fill="#c45c26">42.0</text>
+              <line x1="450" y1="130" x2="450" y2="190" stroke="#c45c26" stroke-width="1"/>
+              <text x="458" y="165" font-size="12" fill="#c45c26">18</text>
+              <text x="85" y="120" font-size="11" fill="#5c6b7a">铰接孔 Ø4（配 M4 螺丝/尼龙棒）</text>
+            </svg>
           </div>
-          <div class="meta-item">
-            <span class="label">推理</span>
-            <span class="value" id="inferMs">—</span>
+          <footer>近节 / 中节 / 远节尺寸递减；远节加防滑纹理（打印面朝上）</footer>
+        </article>
+
+        <!-- Thumb -->
+        <article class="draw-card">
+          <header>
+            <span>拇指座</span>
+            <code>THMB-03</code>
+          </header>
+          <div class="svg-wrap">
+            <svg viewBox="0 0 520 320" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, sans-serif">
+              <rect x="0" y="0" width="520" height="320" fill="#faf8f4"/>
+              <path d="M160,80 L300,60 L360,120 L340,220 L200,250 L120,180 Z"
+                    fill="#dfe8f0" stroke="#1c2430" stroke-width="2.2"/>
+              <circle cx="175" cy="145" r="16" fill="#fff" stroke="#1c2430" stroke-width="2"/>
+              <circle cx="175" cy="145" r="5" fill="#1c2430"/>
+              <circle cx="310" cy="150" r="14" fill="#fff" stroke="#1c2430" stroke-width="2"/>
+              <!-- CMC arc -->
+              <path d="M120,180 Q100,145 130,110" fill="none" stroke="#3d6b8c" stroke-width="2.5" stroke-dasharray="4 3"/>
+              <text x="40" y="130" font-size="11" fill="#3d6b8c">对掌旋转轴</text>
+              <text x="200" y="100" font-size="11" fill="#5c6b7a">两节拇指：可绕掌侧小幅对掌</text>
+              <!-- dim -->
+              <line x1="120" y1="270" x2="360" y2="270" stroke="#c45c26" stroke-width="1"/>
+              <text x="225" y="288" font-size="12" fill="#c45c26">38</text>
+            </svg>
           </div>
-          <div class="meta-item">
-            <span class="label">设备</span>
-            <span class="value device-name" id="deviceName">—</span>
+          <footer>与掌板用 2×M3 固定；可选铜套减摩</footer>
+        </article>
+
+        <!-- Tendon / assembly -->
+        <article class="draw-card">
+          <header>
+            <span>腱绳与滑轮组</span>
+            <code>TEND-04</code>
+          </header>
+          <div class="svg-wrap">
+            <svg viewBox="0 0 520 320" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, sans-serif">
+              <rect x="0" y="0" width="520" height="320" fill="#faf8f4"/>
+              <!-- servo -->
+              <rect x="60" y="80" width="90" height="70" rx="6" fill="#3d6b8c" stroke="#1c2430" stroke-width="1.5"/>
+              <text x="72" y="120" font-size="11" fill="#fff">SG90</text>
+              <!-- pulleys -->
+              <circle cx="220" cy="100" r="16" fill="#fff" stroke="#1c2430" stroke-width="2"/>
+              <circle cx="220" cy="100" r="5" fill="#1c2430"/>
+              <circle cx="320" cy="140" r="14" fill="#fff" stroke="#1c2430" stroke-width="2"/>
+              <circle cx="320" cy="140" r="5" fill="#1c2430"/>
+              <circle cx="400" cy="100" r="14" fill="#fff" stroke="#1c2430" stroke-width="2"/>
+              <!-- path -->
+              <path d="M150,110 L204,100 L306,140 L386,104 L460,120"
+                    fill="none" stroke="#c45c26" stroke-width="2.5"/>
+              <text x="240" y="70" font-size="11" fill="#c45c26">凯夫拉/编织线 Ø0.8–1.0</text>
+              <!-- fingers -->
+              <rect x="450" y="90" width="50" height="55" rx="10" fill="#dfe8f0" stroke="#1c2430" stroke-width="1.8"/>
+              <text x="455" y="125" font-size="10" fill="#1c2430">FPRX</text>
+              <text x="60" y="180" font-size="11" fill="#5c6b7a">舵机臂有效半径 14mm → 行程约 14×θ</text>
+              <text x="60" y="210" font-size="11" fill="#5c6b7a">推荐预紧力：全松时线张力 1–2N</text>
+              <text x="60" y="240" font-size="11" fill="#5c6b7a">导管用 PTFE 管内径 2mm（自行车变速线管可代）</text>
+            </svg>
+          </div>
+          <footer>每指独立舵机；预算有限可用 1 舵机 + 齿条联动四指（欠驱动更明显）</footer>
+        </article>
+      </div>
+    </section>
+
+    <!-- BOM -->
+    <section class="block" id="bom">
+      <div class="section-head">
+        <h2>4. BOM 物料清单</h2>
+        <span class="tag">单价为常见零售参考（2025–2026）</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>类别</th>
+              <th>名称</th>
+              <th>规格</th>
+              <th>数量</th>
+              <th>参考价</th>
+              <th>备注</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>3D 打印件</td>
+              <td>掌板 PALM-01</td>
+              <td class="mono">96×82×12</td>
+              <td>2（左右）</td>
+              <td class="cost">¥12</td>
+              <td>PLA 白/灰，层高 0.2</td>
+            </tr>
+            <tr>
+              <td>3D 打印件</td>
+              <td>手指节 FPRX/MID/DST</td>
+              <td class="mono">42 / 32 / 24</td>
+              <td>15（5指×3）</td>
+              <td class="cost">¥18</td>
+              <td>可一套盘出来</td>
+            </tr>
+            <tr>
+              <td>3D 打印件</td>
+              <td>拇指座 THMB-03</td>
+              <td class="mono">38×28×10</td>
+              <td>1</td>
+              <td class="cost">¥4</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>3D 打印件</td>
+              <td>舵机舱 / 导线夹</td>
+              <td>—</td>
+              <td>若干</td>
+              <td class="cost">¥8</td>
+              <td>并入下单即可</td>
+            </tr>
+            <tr>
+              <td>外购</td>
+              <td>微型舵机</td>
+              <td>SG90 或 MG90S</td>
+              <td>5</td>
+              <td class="cost">¥25</td>
+              <td>金属齿更耐用</td>
+            </tr>
+            <tr>
+              <td>外购</td>
+              <td>PCA9685 16路</td>
+              <td>I2C PWM</td>
+              <td>1</td>
+              <td class="cost">¥8</td>
+              <td>或直接用 ESP32 PWM</td>
+            </tr>
+            <tr>
+              <td>外购</td>
+              <td>主控</td>
+              <td>ESP32-WROOM / Arduino</td>
+              <td>1</td>
+              <td class="cost">¥15</td>
+              <td>ESP32 可 WiFi 遥操作</td>
+            </tr>
+            <tr>
+              <td>外购</td>
+              <td>紧固件包</td>
+              <td>M3×8/12、M4×20 尼龙棒</td>
+              <td>1 包</td>
+              <td class="cost">¥8</td>
+              <td>淘宝「螺丝组合」</td>
+            </tr>
+            <tr>
+              <td>外购</td>
+              <td>腱绳</td>
+              <td>凯夫拉线 1.0mm×5m</td>
+              <td>1</td>
+              <td class="cost">¥6</td>
+              <td>可用编织鱼线</td>
+            </tr>
+            <tr>
+              <td>外购</td>
+              <td>弹簧</td>
+              <td>拉簧 0.2×4×15</td>
+              <td>10</td>
+              <td class="cost">¥5</td>
+              <td>回位</td>
+            </tr>
+            <tr>
+              <td>外购</td>
+              <td>PTFE 导管</td>
+              <td>ID2 OD4</td>
+              <td>1m</td>
+              <td class="cost">¥3</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td><strong>合计</strong></td>
+              <td colspan="3">打印约 250–320g PLA + 外购件</td>
+              <td class="cost">≈ ¥85–110</td>
+              <td>批量可再降</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Print params -->
+    <section class="block" id="print">
+      <div class="section-head">
+        <h2>5. 打印参数建议</h2>
+        <span class="tag">FDM 桌面机即可</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>参数</th><th>推荐值</th><th>说明</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>材料</td><td class="mono">PLA / PLA+</td><td>强度够用；要韧性选 PETG（价格+10%）</td></tr>
+            <tr><td>层高</td><td class="mono">0.2 mm</td><td>兼顾速度与精度</td></tr>
+            <tr><td>壁厚</td><td class="mono">1.2–1.6 mm（3–4 圈）</td><td>铰接孔周边务必加厚</td></tr>
+            <tr><td>填充</td><td class="mono">25–35%</td><td>掌板用 35%，指节 25% 即可</td></tr>
+            <tr><td>支撑</td><td class="mono">指节平放 + 树状支撑</td><td>掌板竖放少支撑</td></tr>
+            <tr><td>公差</td><td class="mono">轴孔单边 +0.15–0.25</td><td>铰接孔建议钻头修配 Ø3.9/4.0</td></tr>
+            <tr><td>颜色</td><td>任意</td><td>功能件建议不透明；演示可分色便于讲解</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Taobao package -->
+    <section class="block" id="taobao">
+      <div class="section-head">
+        <h2>6. 淘宝商家下单方案</h2>
+        <span class="tag">复制文案 → 发给「3D打印代打」客服</span>
+      </div>
+      <div class="package">
+        <div class="package-head">
+          <h3>下单文案（打印件部分）</h3>
+          <div>
+            <button class="btn" id="btnCopyPrint" type="button">复制打印下单文案</button>
+            <button class="btn ghost" id="btnCopyBom" type="button">复制完整 BOM</button>
           </div>
         </div>
+        <div class="package-body">
+          <pre id="printText">【3D打印代打】五指机械手结构件（PLA，层高0.2）
 
-        <section class="replay-block">
-          <div class="replay-head">
-            <h2>3D 复现建模</h2>
-            <span class="replay-hint">拖拽旋转 · 滚轮缩放 · 右侧为参数化手指</span>
+一、打印清单（附图/可切片文件）
+1. 掌部侧板 PALM-01 × 2件
+   - 外形约 96 × 82 × 12 mm，含 M3 孔、舵机舱开窗
+2. 手指近节 FPRX-02 × 5件，42×18×18 mm，中心腱槽，两端 Ø4 铰接孔
+3. 手指中节 FMID-02 × 5件，32×16×16 mm
+4. 手指远节 FDST-02 × 5件，24×15×15 mm，指腹带防滑纹
+5. 拇指座 THMB-03 × 1件
+6. 舵机舱盖 / 线夹 × 1套
+
+二、工艺要求
+- 材料：PLA（或 PETG）
+- 层高：0.2 mm；填充：25–35%；壁厚 ≥3 条线（约1.2mm+）
+- 关键孔位公差：轴孔单边 +0.2 mm，螺孔按 M3 过孔
+- 不接受严重拉丝、缺层、明显翘边；铰接孔通透
+- 打印方向已按「少支撑」给出：掌板竖放，指节平放
+
+三、报价与交期
+- 请报：单套价 / 2套价 / 5套价
+- 交期：期望 5–7 天内寄出
+- 可走一件代发；需要的话我可以提供 STL/3MF
+
+四、收货信息（下单时填写）
+- 顺丰/京东快递优先
+
+备注：这是可动机械手装配件，对铰接孔与轴配合要求较高，请重点检查孔是否通、尺寸是否稳定。</pre>
+          <div class="note">
+            <strong>给商家的文件准备：</strong>
+            将下列零件分别导出 STL（可合并为 zip）：
+            <code>PALM-01_L/R</code>、<code>FPRX-02</code>、<code>FMID-02</code>、<code>FDST-02</code>、
+            <code>THMB-03</code>、<code>SERVO-COVER</code>。
+            命名清晰可大幅减少沟通成本。
           </div>
-          <div class="replay-wrap">
-            <canvas id="replayCanvas"></canvas>
-            <div class="replay-legend">
-              <span class="lg lm">关节点骨架</span>
-              <span class="lg finger">参数化手指（按关节角）</span>
-            </div>
-          </div>
-        </section>
-      </section>
-
-      <aside class="panel">
-        <h2>控制</h2>
-
-        <label class="field">
-          <span class="label">摄像头设备</span>
-          <select id="deviceSelect" disabled>
-            <option value="">开启后可选择</option>
-          </select>
-        </label>
-
-        <label class="field">
-          <span class="label">重点手指</span>
-          <select id="fingerSelect">
-            <option value="1">食指</option>
-            <option value="2">中指</option>
-            <option value="3">无名指</option>
-            <option value="4">小指</option>
-            <option value="0">拇指</option>
-            <option value="-1" selected>全部</option>
-          </select>
-        </label>
-
-        <label class="field checkbox">
-          <input type="checkbox" id="mirror" checked />
-          <span>镜像显示</span>
-        </label>
-
-        <label class="field checkbox">
-          <input type="checkbox" id="showAngles" checked />
-          <span>显示关节角数值</span>
-        </label>
-
-        <label class="field checkbox">
-          <input type="checkbox" id="showTrail" />
-          <span>指尖轨迹</span>
-        </label>
-
-        <div class="actions">
-          <button id="btnStart" class="btn primary">开启摄像头</button>
-          <button id="btnStop" class="btn" disabled>关闭</button>
-          <button id="btnSnapshot" class="btn" disabled>截图</button>
-          <button id="btnFullscreen" class="btn" disabled>全屏</button>
         </div>
+      </div>
 
-        <section class="angles" id="anglesPanel">
-          <div class="angles-head">
-            <h2>关节角</h2>
-            <span class="angles-hint">单位：度</span>
-          </div>
-          <div class="angle-grid" id="angleGrid">
-            <div class="angle-card" data-finger="thumb">
-              <div class="angle-name">拇指</div>
-              <div class="angle-rows" data-for="thumb">
-                <div class="row"><span>CMC</span><b id="thumb-cmc">—</b></div>
-                <div class="row"><span>MCP</span><b id="thumb-mcp">—</b></div>
-                <div class="row"><span>IP</span><b id="thumb-ip">—</b></div>
-              </div>
-            </div>
-            <div class="angle-card" data-finger="index">
-              <div class="angle-name">食指</div>
-              <div class="angle-rows" data-for="index">
-                <div class="row"><span>MCP</span><b id="index-mcp">—</b></div>
-                <div class="row"><span>PIP</span><b id="index-pip">—</b></div>
-                <div class="row"><span>DIP</span><b id="index-dip">—</b></div>
-              </div>
-            </div>
-            <div class="angle-card" data-finger="middle">
-              <div class="angle-name">中指</div>
-              <div class="angle-rows" data-for="middle">
-                <div class="row"><span>MCP</span><b id="middle-mcp">—</b></div>
-                <div class="row"><span>PIP</span><b id="middle-pip">—</b></div>
-                <div class="row"><span>DIP</span><b id="middle-dip">—</b></div>
-              </div>
-            </div>
-            <div class="angle-card" data-finger="ring">
-              <div class="angle-name">无名指</div>
-              <div class="angle-rows" data-for="ring">
-                <div class="row"><span>MCP</span><b id="ring-mcp">—</b></div>
-                <div class="row"><span>PIP</span><b id="ring-pip">—</b></div>
-                <div class="row"><span>DIP</span><b id="ring-dip">—</b></div>
-              </div>
-            </div>
-            <div class="angle-card" data-finger="pinky">
-              <div class="angle-name">小指</div>
-              <div class="angle-rows" data-for="pinky">
-                <div class="row"><span>MCP</span><b id="pinky-mcp">—</b></div>
-                <div class="row"><span>PIP</span><b id="pinky-pip">—</b></div>
-                <div class="row"><span>DIP</span><b id="pinky-dip">—</b></div>
-              </div>
-            </div>
-          </div>
-          <div class="selected-angle" id="selectedAngle">
-            重点手指综合弯曲角 <b id="focusAngle">—</b>
-          </div>
-        </section>
-
-        <div class="tips">
-          <h3>使用提示</h3>
-          <ul>
-            <li>点「开启摄像头」后浏览器会弹出权限请求，请选「允许」。</li>
-            <li>若无弹窗：检查地址栏摄像头权限、系统隐私设置，并用 https/localhost 打开。</li>
-            <li>手尽量放在画面中央、光线充足处。</li>
-            <li>手部模型需联网加载；失败时仍可预览摄像头画面。</li>
-          </ul>
+      <div class="package" style="margin-top:16px">
+        <div class="package-head">
+          <h3>外购件采购清单（发给电子配件店 / 直接搜）</h3>
+          <button class="btn" id="btnCopyParts" type="button">复制采购清单</button>
         </div>
+        <div class="package-body">
+          <pre id="partsText">【机械手电子与耗材包】
+1. SG90 或 MG90S 舵机 × 5
+2. PCA9685 16路 PWM 模块 × 1
+3. ESP32 开发板（WROOM-32）× 1
+4. M3×8 螺丝 20、M3×12 20、M3 螺母 20
+5. M4 尼龙棒/螺丝 15×20mm × 5（做铰轴）
+6. 凯夫拉线/编织线 1.0mm × 5m
+7. 拉簧 0.2×4×15mm × 10
+8. PTFE 导管 ID2×OD4 × 1m
+9. 杜邦线母对母 × 20、USB 供电线
 
-        <div class="error-box" id="errorBox" hidden>
-          <strong>出错了</strong>
-          <p id="errorText"></p>
+关键词：SG90 舵机 / PCA9685 / 凯夫拉线 / 手工拉簧 / PTFE 管
+预算约 ¥70–90（不含打印）</pre>
         </div>
-      </aside>
-    </main>
+      </div>
+    </section>
 
-    <footer class="footer">
-      <span>本地处理 · 视频不上传 · 关节点仅在浏览器内推理</span>
+    <!-- Assembly -->
+    <section class="block" id="assembly">
+      <div class="section-head">
+        <h2>7. 装配与验收</h2>
+        <span class="tag">约 2–3 小时</span>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <div class="n">1</div>
+          <h4>铰轴与手指</h4>
+          <p>近节→中节→远节用 M4 尼龙棒串联，转动灵活无卡滞，回位弹簧就位。</p>
+        </div>
+        <div class="step">
+          <div class="n">2</div>
+          <h4>穿腱绳</h4>
+          <p>经导管引到舵机臂；调节初长度，使全松张开、全紧约 60–80° 屈曲。</p>
+        </div>
+        <div class="step">
+          <div class="n">3</div>
+          <h4>固定掌板</h4>
+          <p>左右夹板对合，安装舵机与 PCA9685，注意线序与 I2C 地址。</p>
+        </div>
+        <div class="step">
+          <div class="n">4</div>
+          <h4>上电标定</h4>
+          <p>中位 90° 微调脉宽；测试单指再联动；可接现有视觉关节角输入。</p>
+        </div>
+      </div>
+      <div class="note">
+        <strong>验收标准：</strong>
+        ① 五指可独立或联动屈伸；② 保持力（轻物 200–400g）足够演示；
+        ③ 连续动作 50 次无脱线、无裂件；④ 与主端软件通讯延迟 &lt; 50ms（若接遥操作）。
+      </div>
+    </section>
+
+    <footer class="page-foot">
+      低成本五指欠驱动机械手 · 设计交付包 · 可配合视觉关节角遥操作 / 灵巧手课题继续扩展
+      &nbsp;|&nbsp;
+      <a href="game.html">体感搭积木</a>
     </footer>
   </div>
 
-  <script src="app.js"></script>
-  <script type="module" src="replay3d.js"></script>
+  <div id="toast"></div>
+
+  <script type="module" src="hand-design.js"></script>
   <script>
-    // 最小兜底：主脚本异常时仍可申请摄像头
-    (function () {
-      document.addEventListener("click", function (e) {
-        var t = e.target;
-        if (!t || !t.id || t.id !== "btnStart") return;
-        if (window.__mcStart) return; // 已由 app.js 处理
-        console.warn("[mc] fallback start");
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          alert("当前环境不支持摄像头 API，请用 https/localhost + Chrome/Edge");
-          return;
-        }
-        navigator.mediaDevices.getUserMedia({ video: true }).then(function (s) {
-          var v = document.getElementById("video");
-          if (v) {
-            v.srcObject = s;
-            v.play();
-          }
-          var ph = document.getElementById("placeholder");
-          if (ph) ph.classList.add("hidden");
-          var st = document.getElementById("status");
-          if (st) {
-            st.dataset.state = "live";
-            document.getElementById("statusText").textContent = "采集中（兜底模式）";
-          }
-        }).catch(function (err) {
-          alert("摄像头打开失败：" + err.name + " " + err.message);
-        });
-      }, true);
-    })();
+    // copy helpers
+    function toast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.classList.add("show");
+      setTimeout(() => t.classList.remove("show"), 1800);
+    }
+    function copyEl(id) {
+      const el = document.getElementById(id);
+      const text = el ? el.textContent : "";
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => toast("已复制到剪贴板"));
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        toast("已复制到剪贴板");
+      }
+    }
+    document.getElementById("btnCopyPrint")?.addEventListener("click", () => copyEl("printText"));
+    document.getElementById("btnCopyBom")?.addEventListener("click", () => copyEl("partsText"));
+    document.getElementById("btnCopyParts")?.addEventListener("click", () => copyEl("partsText"));
   </script>
 </body>
 </html>

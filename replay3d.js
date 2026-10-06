@@ -106,13 +106,23 @@ export class HandReplay {
     this.buildFingerRig();
 
     this._frame = 0;
-    this._autoRotate = true;
+    // 球坐标相机（目标点 + 半径 + 方位角/俯仰角）
+    this._target = new THREE.Vector3(0, 0.1, 0);
+    this._spherical = {
+      radius: 1.85,
+      theta: 0.55, // 水平
+      phi: 1.15,   // 垂直（极角）
+    };
+    // 目标值用于阻尼插值
+    this._sphericalTarget = { ...this._spherical };
+    this._autoRotate = false;
     this._pointerDown = false;
+    this._pointers = new Map();
     this._lastX = 0;
     this._lastY = 0;
-    this._rotY = 0.35;
-    this._rotX = 0.25;
+    this._pinchDist = 0;
     this.bindPointer();
+    this.applyCamera(1);
 
     this.animate = this.animate.bind(this);
     requestAnimationFrame(this.animate);
@@ -187,36 +197,153 @@ export class HandReplay {
 
   bindPointer() {
     const el = this.canvas;
-    el.addEventListener("pointerdown", (e) => {
+    // 防止页面跟随拖拽滚动
+    el.style.touchAction = "none";
+    el.style.userSelect = "none";
+
+    const onDown = (e) => {
+      if (e.button !== undefined && e.button !== 0 && e.button !== 1 && e.button !== 2) return;
+      el.setPointerCapture?.(e.pointerId);
+      this._pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       this._pointerDown = true;
       this._lastX = e.clientX;
       this._lastY = e.clientY;
       this._autoRotate = false;
-    });
-    window.addEventListener("pointerup", () => {
-      this._pointerDown = false;
-    });
-    el.addEventListener("pointermove", (e) => {
+
+      if (this._pointers.size === 2) {
+        const pts = [...this._pointers.values()];
+        this._pinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      }
+      e.preventDefault();
+    };
+
+    const onMove = (e) => {
+      if (!this._pointers.has(e.pointerId)) return;
+      this._pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      // 双指捏合 → 缩放
+      if (this._pointers.size === 2) {
+        const pts = [...this._pointers.values()];
+        const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        if (this._pinchDist > 0) {
+          const scale = this._pinchDist / Math.max(dist, 1);
+          this._sphericalTarget.radius = THREE.MathUtils.clamp(
+            this._sphericalTarget.radius * scale,
+            0.7,
+            4.5
+          );
+        }
+        this._pinchDist = dist;
+        e.preventDefault();
+        return;
+      }
+
       if (!this._pointerDown) return;
       const dx = e.clientX - this._lastX;
       const dy = e.clientY - this._lastY;
-      this._rotY += dx * 0.01;
-      this._rotX += dy * 0.01;
       this._lastX = e.clientX;
       this._lastY = e.clientY;
-    });
+
+      // 右键 / 中键 / Shift：平移；左键：旋转
+      const panMode = e.button === 2 || e.button === 1 || e.shiftKey;
+      if (panMode) {
+        const scale = this._sphericalTarget.radius * 0.0018;
+        this._target.x -= dx * scale;
+        this._target.y += dy * scale;
+      } else {
+        this._sphericalTarget.theta -= dx * 0.0065;
+        this._sphericalTarget.phi = THREE.MathUtils.clamp(
+          this._sphericalTarget.phi - dy * 0.0065,
+          0.15,
+          Math.PI - 0.15
+        );
+      }
+      e.preventDefault();
+    };
+
+    const onUp = (e) => {
+      this._pointers.delete(e.pointerId);
+      if (this._pointers.size === 0) {
+        this._pointerDown = false;
+        this._pinchDist = 0;
+      } else if (this._pointers.size === 1) {
+        const rest = [...this._pointers.values()][0];
+        this._lastX = rest.x;
+        this._lastY = rest.y;
+        this._pinchDist = 0;
+      }
+      try {
+        el.releasePointerCapture?.(e.pointerId);
+      } catch (_) {}
+    };
+
+    el.addEventListener("pointerdown", onDown);
+    el.addEventListener("pointermove", onMove);
+    el.addEventListener("pointerup", onUp);
+    el.addEventListener("pointercancel", onUp);
+    el.addEventListener("pointerleave", onUp);
+    el.addEventListener("contextmenu", (e) => e.preventDefault());
+
     el.addEventListener(
       "wheel",
       (e) => {
         e.preventDefault();
-        this.camera.position.z = THREE.MathUtils.clamp(
-          this.camera.position.z + e.deltaY * 0.0015,
-          0.6,
-          3.5
+        const k = e.deltaMode === 1 ? 0.08 : 0.0012;
+        this._sphericalTarget.radius = THREE.MathUtils.clamp(
+          this._sphericalTarget.radius * (1 + e.deltaY * k),
+          0.7,
+          4.5
         );
       },
       { passive: false }
     );
+
+    // 双击复位
+    el.addEventListener("dblclick", () => {
+      this.resetView();
+    });
+
+    // 键盘：R 复位
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "r" || e.key === "R") {
+        const tag = (e.target && e.target.tagName) || "";
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        this.resetView();
+      }
+    });
+  }
+
+  resetView() {
+    this._target.set(0, 0.1, 0);
+    this._sphericalTarget.radius = 1.85;
+    this._sphericalTarget.theta = 0.55;
+    this._sphericalTarget.phi = 1.15;
+    this._autoRotate = false;
+  }
+
+  setAutoRotate(on) {
+    this._autoRotate = !!on;
+  }
+
+  applyCamera(smooth) {
+    const s = this._spherical;
+    const t = this._sphericalTarget;
+    const k = smooth == null ? 0.18 : smooth;
+    s.radius += (t.radius - s.radius) * k;
+    s.theta += (t.theta - s.theta) * k;
+    s.phi += (t.phi - s.phi) * k;
+
+    const sinPhi = Math.sin(s.phi);
+    const cosPhi = Math.cos(s.phi);
+    const sinTheta = Math.sin(s.theta);
+    const cosTheta = Math.cos(s.theta);
+
+    this.camera.position.set(
+      this._target.x + s.radius * sinPhi * sinTheta,
+      this._target.y + s.radius * cosPhi,
+      this._target.z + s.radius * sinPhi * cosTheta
+    );
+    this.camera.lookAt(this._target);
   }
 
   setFocus(fingerName) {
@@ -329,15 +456,9 @@ export class HandReplay {
     requestAnimationFrame(this.animate);
     this._frame++;
     if (this._autoRotate) {
-      this._rotY += 0.003;
+      this._sphericalTarget.theta += 0.004;
     }
-    // orbit
-    const r = this.camera.position.length() || 1.6;
-    const cy = Math.max(0.7, r);
-    this.camera.position.x = Math.sin(this._rotY) * Math.cos(this._rotX) * cy;
-    this.camera.position.z = Math.cos(this._rotY) * Math.cos(this._rotX) * cy;
-    this.camera.position.y = Math.sin(this._rotX) * cy * 0.65 + 0.15;
-    this.camera.lookAt(0, 0.1, 0);
+    this.applyCamera(0.18);
     this.renderer.render(this.scene, this.camera);
   }
 }
@@ -352,12 +473,25 @@ if (canvas) {
   const replay = new HandReplay(canvas);
   window.__handReplay = replay;
 
+  const btnRotate = document.getElementById("btnAutoRotate");
+  const btnReset = document.getElementById("btnResetView");
+  if (btnRotate) {
+    btnRotate.addEventListener("click", () => {
+      const next = !replay._autoRotate;
+      replay.setAutoRotate(next);
+      btnRotate.classList.toggle("active", next);
+      btnRotate.textContent = next ? "停止旋转" : "自动旋转";
+    });
+  }
+  if (btnReset) {
+    btnReset.addEventListener("click", () => replay.resetView());
+  }
+
   window.__replayUpdate = function (landmarks, fingerAngles, focusKey) {
     replay.update(landmarks, fingerAngles, focusKey);
     replay.setFocus(focusKey || "all");
   };
 
   window.addEventListener("resize", () => replay.resize());
-  // 等布局后再 resize 一次
   requestAnimationFrame(() => replay.resize());
 }

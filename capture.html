@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>手指运动采集 · 视觉主端</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"></div>
+        <div>
+          <h1>手指运动采集</h1>
+          <p class="sub">摄像头 · 手部关节点 · 关节角 · MC 桥接</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <a class="btn mini" href="index.html">机械手设计</a>
+        <a class="btn mini" href="mc-hand.html">MC 方案</a>
+        <a class="btn mini" href="game.html">搭积木</a>
+        <div class="status" id="status" data-state="idle">
+          <span class="dot"></span>
+          <span id="statusText">未开启</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="stage">
+        <div class="viewport" id="viewport">
+          <video id="video" playsinline autoplay muted></video>
+          <canvas id="overlay"></canvas>
+          <div class="placeholder" id="placeholder">
+            <div class="placeholder-icon" aria-hidden="true">
+              <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                <rect x="6" y="14" width="28" height="20" rx="4" stroke="currentColor" stroke-width="2"/>
+                <path d="M34 20l8-4v16l-8-4V20z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                <circle cx="16" cy="24" r="4" stroke="currentColor" stroke-width="2"/>
+              </svg>
+            </div>
+            <p>点击「开启摄像头」开始采集</p>
+            <p class="hint">将手放入画面，即可看到关节点与关节角</p>
+          </div>
+          <div class="badge" id="handBadge" hidden>已检测到手</div>
+        </div>
+
+        <div class="meta">
+          <div class="meta-item"><span class="label">分辨率</span><span class="value" id="resolution">—</span></div>
+          <div class="meta-item"><span class="label">帧率</span><span class="value" id="fps">—</span></div>
+          <div class="meta-item"><span class="label">推理</span><span class="value" id="inferMs">—</span></div>
+          <div class="meta-item"><span class="label">设备</span><span class="value device-name" id="deviceName">—</span></div>
+        </div>
+
+        <section class="replay-block">
+          <div class="replay-head">
+            <h2>3D 复现建模</h2>
+            <div class="replay-actions">
+              <button type="button" class="btn mini" id="btnAutoRotate">自动旋转</button>
+              <button type="button" class="btn mini" id="btnResetView">复位视角</button>
+              <span class="replay-hint">左键旋转 · 滚轮缩放 · 右键平移</span>
+            </div>
+          </div>
+          <div class="replay-wrap">
+            <canvas id="replayCanvas"></canvas>
+            <div class="replay-legend">
+              <span class="lg lm">关节点骨架</span>
+              <span class="lg finger">参数化手指（按关节角）</span>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <aside class="panel">
+        <h2>控制</h2>
+
+        <label class="field">
+          <span class="label">摄像头设备</span>
+          <select id="deviceSelect" disabled>
+            <option value="">开启后可选择</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span class="label">重点手指</span>
+          <select id="fingerSelect">
+            <option value="1">食指</option>
+            <option value="2">中指</option>
+            <option value="3">无名指</option>
+            <option value="4">小指</option>
+            <option value="0">拇指</option>
+            <option value="-1" selected>全部</option>
+          </select>
+        </label>
+
+        <label class="field checkbox">
+          <input type="checkbox" id="mirror" checked />
+          <span>镜像显示</span>
+        </label>
+
+        <label class="field checkbox">
+          <input type="checkbox" id="showAngles" checked />
+          <span>显示关节角数值</span>
+        </label>
+
+        <label class="field checkbox">
+          <input type="checkbox" id="showTrail" />
+          <span>指尖轨迹</span>
+        </label>
+
+        <div class="actions">
+          <button id="btnStart" class="btn primary">开启摄像头</button>
+          <button id="btnStop" class="btn" disabled>关闭</button>
+          <button id="btnSnapshot" class="btn" disabled>截图</button>
+          <button id="btnFullscreen" class="btn" disabled>全屏</button>
+        </div>
+
+        <section class="bridge-box">
+          <div class="bridge-head">
+            <h2>MC 桥接</h2>
+            <span class="bridge-state" id="bridgeStatus" data-kind="">未启用</span>
+          </div>
+          <label class="field checkbox">
+            <input type="checkbox" id="bridgeEnable" />
+            <span>推送关节角到 CC:Tweaked</span>
+          </label>
+          <p class="bridge-hint">
+            需先运行 <code>bridge_server.py</code>（127.0.0.1:8765），
+            游戏内 CC 电脑再轮询该地址驱动机械手。
+          </p>
+        </section>
+
+        <section class="angles" id="anglesPanel">
+          <div class="angles-head">
+            <h2>关节角</h2>
+            <span class="angles-hint">单位：度</span>
+          </div>
+          <div class="angle-grid" id="angleGrid">
+            <div class="angle-card" data-finger="thumb">
+              <div class="angle-name">拇指</div>
+              <div class="angle-rows" data-for="thumb">
+                <div class="row"><span>CMC</span><b id="thumb-cmc">—</b></div>
+                <div class="row"><span>MCP</span><b id="thumb-mcp">—</b></div>
+                <div class="row"><span>IP</span><b id="thumb-ip">—</b></div>
+              </div>
+            </div>
+            <div class="angle-card" data-finger="index">
+              <div class="angle-name">食指</div>
+              <div class="angle-rows" data-for="index">
+                <div class="row"><span>MCP</span><b id="index-mcp">—</b></div>
+                <div class="row"><span>PIP</span><b id="index-pip">—</b></div>
+                <div class="row"><span>DIP</span><b id="index-dip">—</b></div>
+              </div>
+            </div>
+            <div class="angle-card" data-finger="middle">
+              <div class="angle-name">中指</div>
+              <div class="angle-rows" data-for="middle">
+                <div class="row"><span>MCP</span><b id="middle-mcp">—</b></div>
+                <div class="row"><span>PIP</span><b id="middle-pip">—</b></div>
+                <div class="row"><span>DIP</span><b id="middle-dip">—</b></div>
+              </div>
+            </div>
+            <div class="angle-card" data-finger="ring">
+              <div class="angle-name">无名指</div>
+              <div class="angle-rows" data-for="ring">
+                <div class="row"><span>MCP</span><b id="ring-mcp">—</b></div>
+                <div class="row"><span>PIP</span><b id="ring-pip">—</b></div>
+                <div class="row"><span>DIP</span><b id="ring-dip">—</b></div>
+              </div>
+            </div>
+            <div class="angle-card" data-finger="pinky">
+              <div class="angle-name">小指</div>
+              <div class="angle-rows" data-for="pinky">
+                <div class="row"><span>MCP</span><b id="pinky-mcp">—</b></div>
+                <div class="row"><span>PIP</span><b id="pinky-pip">—</b></div>
+                <div class="row"><span>DIP</span><b id="pinky-dip">—</b></div>
+              </div>
+            </div>
+          </div>
+          <div class="selected-angle" id="selectedAngle">
+            重点手指综合弯曲角 <b id="focusAngle">—</b>
+          </div>
+        </section>
+
+        <div class="tips">
+          <h3>使用提示</h3>
+          <ul>
+            <li>点「开启摄像头」后浏览器会弹出权限请求，请选「允许」。</li>
+            <li>手部模型已本地化，无需外网。</li>
+            <li>要用 MC 桥接，先启动 <code>bridge_server.py</code> 再勾选开关。</li>
+          </ul>
+        </div>
+
+        <div class="error-box" id="errorBox" hidden>
+          <strong>出错了</strong>
+          <p id="errorText"></p>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="footer">
+      <span>本地处理 · 视频不上传 · 关节角可推送到 MC</span>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+  <script type="module" src="replay3d.js"></script>
+  <script>
+    // 桥接开关（放在这里避免改动 app.js 的初始化顺序）
+    (function () {
+      var cb = document.getElementById("bridgeEnable");
+      if (!cb) return;
+      cb.addEventListener("change", function () {
+        window.__bridgeOn = cb.checked;
+        var el = document.getElementById("bridgeStatus");
+        if (el) el.textContent = cb.checked ? "等待数据…" : "未启用";
+      });
+    })();
+  </script>
+</body>
+</html>

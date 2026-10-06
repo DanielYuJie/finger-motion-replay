@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MC 机械手桥接 · 搭建指南</title>
+<style>
+  :root{
+    --bg:#0f1519; --panel:#161e24; --panel2:#1c252c;
+    --ink:#e8eef5; --dim:#8b9bab; --line:#2a3542;
+    --brass:#e0b45c; --accent:#3d9cf0; --ok:#3ecf8e; --warn:#f0b429; --err:#f07178;
+    --mono:"Cascadia Code",Consolas,ui-monospace,monospace;
+    --sans:"PingFang SC","Microsoft YaHei",-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.75;}
+  .wrap{max-width:1080px;margin:0 auto;padding:34px 24px 70px;}
+
+  header.top{
+    background:linear-gradient(150deg,#141c22,#1d2830);
+    border-bottom:1px solid var(--line);padding:44px 0 38px;margin-bottom:0;
+  }
+  .wrap-h{max-width:1080px;margin:0 auto;padding:0 24px;}
+  .tag{display:inline-block;font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--brass);border:1px solid rgba(224,180,92,.4);background:rgba(224,180,92,.08);
+    border-radius:999px;padding:6px 14px;font-weight:600;}
+  h1{font-size:clamp(1.7rem,4vw,2.4rem);margin:20px 0 12px;letter-spacing:-.01em;font-weight:800;}
+  h1 span{color:var(--brass);}
+  header.top p{color:#a9b8c6;max-width:66ch;margin:0;}
+
+  section{padding:44px 0 0;}
+  h2{font-size:1.25rem;margin:0 0 6px;font-weight:800;display:flex;align-items:baseline;gap:12px;}
+  h2 .n{font-family:var(--mono);font-size:1rem;color:var(--brass);}
+  .sub{color:var(--dim);font-size:.85rem;margin:0 0 20px;}
+  h3{font-size:1rem;margin:26px 0 10px;font-weight:700;color:#d3e0ea;}
+  p{margin:0 0 14px;color:#c3d2de;}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin:16px 0;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media(max-width:820px){.grid2{grid-template-columns:1fr;}}
+
+  .chain{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px;margin:18px 0;overflow-x:auto;}
+  .chain pre{margin:0;font-family:var(--mono);font-size:.8rem;line-height:1.85;color:#cfe0ee;white-space:pre;}
+
+  table{width:100%;border-collapse:collapse;font-size:.87rem;margin:14px 0;
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;}
+  th,td{padding:10px 13px;text-align:left;border-bottom:1px solid #202a33;}
+  th{background:var(--panel2);color:var(--dim);font-size:.76rem;letter-spacing:.05em;text-transform:uppercase;}
+  tr:last-child td{border-bottom:0;}
+  code{font-family:var(--mono);font-size:.84rem;color:var(--brass);background:#111a20;
+    padding:2px 6px;border-radius:5px;}
+
+  pre.code{background:#0b1216;border:1px solid var(--line);border-radius:12px;padding:16px 18px;
+    overflow-x:auto;font-family:var(--mono);font-size:.78rem;line-height:1.7;color:#cfe0ee;white-space:pre;}
+
+  ol.steps{margin:0;padding-left:0;list-style:none;counter-reset:s;}
+  ol.steps li{counter-increment:s;position:relative;padding:14px 18px 14px 58px;margin-bottom:10px;
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;}
+  ol.steps li::before{content:counter(s);position:absolute;left:18px;top:15px;width:26px;height:26px;
+    border-radius:50%;background:var(--brass);color:#1a1206;font-family:var(--mono);font-weight:800;
+    font-size:.82rem;display:flex;align-items:center;justify-content:center;}
+  ol.steps li b{display:block;margin-bottom:3px;}
+  ol.steps li span{font-size:.86rem;color:var(--dim);}
+
+  .callout{border-left:3px solid var(--warn);background:rgba(240,180,41,.09);
+    border-radius:0 10px 10px 0;padding:14px 18px;margin:16px 0;font-size:.88rem;color:#e2d6b8;}
+  .callout.ok{border-color:var(--ok);background:rgba(62,207,142,.09);color:#bfe6d3;}
+  .callout.err{border-color:var(--err);background:rgba(240,113,120,.09);color:#f0c8cb;}
+  .callout b{color:#fff;}
+
+  ul{padding-left:20px;color:#c3d2de;font-size:.9rem;}
+  li{margin-bottom:5px;}
+
+  .btns{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0;}
+  .btn{appearance:none;border:1px solid var(--brass);background:rgba(224,180,92,.12);color:var(--brass);
+    padding:9px 16px;border-radius:9px;font-size:.86rem;cursor:pointer;font-family:inherit;font-weight:600;}
+  .btn:hover{background:rgba(224,180,92,.22);}
+  .btn.ghost{border-color:var(--line);background:transparent;color:var(--dim);}
+
+  footer{margin-top:44px;padding-top:20px;border-top:1px solid var(--line);color:var(--dim);font-size:.78rem;}
+  #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(16px);
+    background:#111a20;border:1px solid var(--brass);color:var(--brass);padding:10px 18px;
+    border-radius:999px;font-size:.85rem;opacity:0;pointer-events:none;transition:.22s;z-index:99;}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap-h">
+    <span class="tag">路线 A · CC:Tweaked + 本机服务</span>
+    <h1>让真实的手驱动 <span>Minecraft 机械手</span></h1>
+    <p>摄像头采集手指关节角 → 本机中继服务 → CC:Tweaked 电脑轮询 → 红石脉冲 → Create 序列换挡 → 游戏内机械手跟随弯曲。</p>
+  </div>
+</header>
+
+<div class="wrap">
+
+<!-- 1 -->
+<section>
+  <h2><span class="n">01</span>整条链路</h2>
+  <p class="sub">SIGNAL CHAIN</p>
+  <div class="chain"><pre>
+  ┌─────────────┐   MediaPipe    ┌──────────────┐
+  │  摄像头      │ ────────────▶ │  21 关节点    │
+  └─────────────┘   浏览器内     └──────┬───────┘
+                                        │ 关节角 MCP/PIP/DIP
+                                        ▼
+                              ┌──────────────────┐
+                              │  capture.html    │  ← 勾选「推送关节角」
+                              └────────┬─────────┘
+                                       │ POST /update (JSON, 30Hz)
+                                       ▼
+                              ┌──────────────────┐
+                              │ bridge_server.py │  127.0.0.1:8765
+                              └────────┬─────────┘
+                                       │ GET /angles
+                                       ▼
+                              ┌──────────────────┐
+                              │ CC:Tweaked 电脑   │  mc_hand.lua
+                              └────────┬─────────┘
+                                       │ 红石脉冲（5 面 = 五指）
+                                       ▼
+                              ┌──────────────────┐
+                              │ Create 序列换挡   │  1 脉冲 = STEP_DEG
+                              └────────┬─────────┘
+                                       ▼
+                              ┌──────────────────┐
+                              │  机械手跟随弯曲   │
+                              └──────────────────┘
+  </pre></div>
+</section>
+
+<!-- 2 -->
+<section>
+  <h2><span class="n">02</span>已就绪 / 待办</h2>
+  <p class="sub">CHECKLIST</p>
+  <div class="grid2">
+    <div class="card">
+      <h3 style="margin-top:0;color:var(--ok)">✅ 已装好</h3>
+      <ul>
+        <li>Minecraft 1.20.1 + Forge 47.4.10</li>
+        <li>Create 6.0.8（含 Flywheel / Ponder）</li>
+        <li><b>CC:Tweaked 1.120.2</b>（已放入 mods）</li>
+        <li><code>computercraft-server.toml</code> 已放行 127.0.0.1</li>
+        <li><code>bridge_server.py</code>（已测试通过）</li>
+        <li><code>capture.html</code> 带桥接开关</li>
+        <li><code>mc_hand.lua</code> 控制脚本</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0;color:var(--warn)">⬜ 你要做的</h3>
+      <ul>
+        <li><b>重启游戏</b>（CC:Tweaked 才会加载）</li>
+        <li>在游戏里放一台 <b>电脑</b> 并接线</li>
+        <li>配置 5 个 <b>序列换挡</b> 的角度</li>
+        <li>建好机械手本体（见 mc-hand.html）</li>
+        <li>把 <code>mc_hand.lua</code> 贴进电脑</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout">
+    <b>注意：</b>CC:Tweaked 刚装进去，<b>必须重启游戏</b>才会生效。你现在的存档不受影响。
+  </div>
+</section>
+
+<!-- 3 -->
+<section>
+  <h2><span class="n">03</span>电脑端：三步启动</h2>
+  <p class="sub">PC SIDE</p>
+  <ol class="steps">
+    <li><b>启动中继服务</b>
+      <span>在本目录执行：<code>python bridge_server.py</code>　看到「监听 http://127.0.0.1:8765」即可。</span></li>
+    <li><b>打开采集页并开摄像头</b>
+      <span>浏览器打开 <code>capture.html</code> → 点「开启摄像头」→ 允许权限。
+      右侧「MC 桥接」勾上<b>推送关节角到 CC:Tweaked</b>，状态应变成「已连接 · N 帧」。</span></li>
+    <li><b>验证链路</b>
+      <span>浏览器访问 <code>http://127.0.0.1:8765/angles</code>，能看到五指 flex 数值随你的手变化，说明主端通了。</span></li>
+  </ol>
+  <div class="callout ok">
+    <b>自检：</b>手离开画面 1 秒后，<code>/angles</code> 里 <code>hand</code> 会变 <code>false</code>，机械手会自动松开回零。
+  </div>
+</section>
+
+<!-- 4 -->
+<section>
+  <h2><span class="n">04</span>游戏端：接线</h2>
+  <p class="sub">REDSTONE WIRING</p>
+  <p>电脑 6 个侧面各接一根红石线，一根控制一根手指。序列换挡配成「脉冲一次转 15°」。</p>
+  <table>
+    <thead><tr><th>电脑侧面</th><th>手指</th><th>接到</th></tr></thead>
+    <tbody>
+      <tr><td><code>left</code>（左）</td><td>拇指</td><td>拇指的序列换挡</td></tr>
+      <tr><td><code>top</code>（上）</td><td>食指</td><td>食指的序列换挡</td></tr>
+      <tr><td><code>bottom</code>（下）</td><td>中指</td><td>中指的序列换挡</td></tr>
+      <tr><td><code>right</code>（右）</td><td>无名指</td><td>无名指的序列换挡</td></tr>
+      <tr><td><code>front</code>（前）</td><td>小指</td><td>小指的序列换挡</td></tr>
+      <tr><td><code>back</code>（后）</td><td>—</td><td>空余（可接指示灯）</td></tr>
+    </tbody>
+  </table>
+
+  <h3>序列换挡怎么配</h3>
+  <ul>
+    <li>信号 <b>ON</b> → 旋转 <b>+15°</b></li>
+    <li>信号 <b>OFF</b> → 旋转 <b>−15°</b></li>
+  </ul>
+  <p>这样一串脉冲就能「推」或「拉」手指。<code>mc_hand.lua</code> 里 <code>STEP_DEG = 15</code> 要和这里一致。</p>
+</section>
+
+<!-- 5 -->
+<section>
+  <h2><span class="n">05</span>把脚本装进电脑</h2>
+  <p class="sub">INSTALL LUA</p>
+  <p>在游戏里对着 CC 电脑右键打开终端，输入 <code>edit mc_hand.lua</code>，把下面代码整段贴进去，<code>Ctrl</code> → 保存 → 退出。然后执行：</p>
+  <pre class="code">mc_hand.lua</pre>
+  <div class="btns">
+    <button class="btn" onclick="copyLua()">复制 mc_hand.lua 全文</button>
+    <button class="btn ghost" onclick="copyCmd()">复制启动命令</button>
+  </div>
+  <p style="color:var(--dim);font-size:.85rem">脚本文件也在本目录：<code>mc_hand.lua</code></p>
+</section>
+
+<!-- 6 -->
+<section>
+  <h2><span class="n">06</span>调参与排错</h2>
+  <p class="sub">TUNING &amp; TROUBLESHOOTING</p>
+  <table>
+    <thead><tr><th>现象</th><th>原因</th><th>处理</th></tr></thead>
+    <tbody>
+      <tr><td>电脑里 <code>http.get</code> 报错 / 返回 nil</td><td>HTTP API 没开</td><td>检查 <code>computercraft-server.toml</code> 里 <code>http.enabled = true</code>，改完重启游戏</td></tr>
+      <tr><td>采集页显示「未连接」</td><td>中继服务没启动</td><td>先跑 <code>bridge_server.py</code>，再刷新采集页</td></tr>
+      <tr><td>手指一直抖 / 来回弹</td><td>死区太小</td><td>把 <code>DEADBAND</code> 从 8 调到 12–15</td></tr>
+      <tr><td>手指方向反了</td><td>换挡 ON/OFF 的旋转方向配反</td><td>在游戏里调换序列换挡的两个角度，或对调脚本里的加减号</td></tr>
+      <tr><td>动作慢吞吞</td><td><code>MAX_PULSE</code> 太小</td><td>从 3 提到 5，或把 <code>POLL</code> 调小到 0.05</td></tr>
+      <tr><td>手指乱甩</td><td>脉冲太密</td><td>把 <code>PULSE_ON</code>/<code>PULSE_OFF</code> 提到 0.1，或降低 <code>MAX_PULSE</code></td></tr>
+      <tr><td>弯曲幅度不够</td><td><code>MAX_DEG</code> 限制</td><td>提到 120（注意别让机构自撞）</td></tr>
+    </tbody>
+  </table>
+  <div class="callout">
+    <b>核心难点：</b>Create 没有角度传感器，只能<b>增量式</b>控制——脚本内部记着每指当前角度，
+    每次只补「还差几个脉冲」。所以脚本重启后角度计数归零，机械手会与实际位置不同步，
+    此时手动把所有手指推到张开状态再跑脚本即可。
+  </div>
+</section>
+
+<!-- 7 -->
+<section>
+  <h2><span class="n">07</span>下一步可选加料</h2>
+  <p class="sub">NEXT</p>
+  <ul>
+    <li>把从端升级到<b>每节一轴承</b>（15 DoF），更接近视频里的多关节手</li>
+    <li>加 <b>Rope Pulley</b> 做腱绳式牵引，手感更接近实物</li>
+    <li>用 <b>显示器（Monitor）</b> 每指状态，方便演示</li>
+    <li>做实体手套替换摄像头：弯曲传感器 → ESP32 → 同一个 <code>/update</code> 接口，脚本零改动</li>
+  </ul>
+</section>
+
+<footer>
+  MC 机械手桥接指南 · 路线 A（CC:Tweaked + 本机 HTTP 服务）· 与 finger-motion-replay 项目配套
+</footer>
+</div>
+
+<div id="toast"></div>
+
+<script>
+function toast(t){
+  var el=document.getElementById('toast');
+  el.textContent=t; el.classList.add('show');
+  setTimeout(function(){el.classList.remove('show');},1700);
+}
+function copyText(txt){
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(function(){toast('已复制');});
+  }else{
+    var ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);
+    ta.select();document.execCommand('copy');document.body.removeChild(ta);toast('已复制');
+  }
+}
+function copyCmd(){ copyText('mc_hand.lua'); }
+function copyLua(){
+  fetch('mc_hand.lua').then(function(r){return r.text();})
+    .then(function(t){copyText(t);})
+    .catch(function(){toast('读取失败，请手动打开 mc_hand.lua');});
+}
+</script>
+</body>
+</html>

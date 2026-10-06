@@ -38,11 +38,11 @@
     return;
   }
 
-  // 本地 vendor 资源，避免 CDN 版本不存在 / 网络拦截
-  const MODEL_URL = "vendor/hand_landmarker.task";
-  const WASM_BASE = "vendor/wasm";
+  // 本地 vendor 资源（import 需绝对/相对 URL）
+  const MODEL_URL = new URL("./vendor/hand_landmarker.task", window.location.href).href;
+  const WASM_BASE = new URL("./vendor/wasm/", window.location.href).href;
   const VISION_CANDIDATES = [
-    "vendor/vision_bundle.mjs",
+    new URL("./vendor/vision_bundle.mjs", window.location.href).href,
     "./vendor/vision_bundle.mjs",
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/vision_bundle.mjs",
   ];
@@ -437,9 +437,68 @@
       if (typeof window.__replayUpdate === "function") {
         window.__replayUpdate(first, ang, focusName);
       }
-    } else if (typeof window.__replayUpdate === "function") {
-      window.__replayUpdate(null, null, null);
+      pushBridge(ang);
+    } else {
+      if (typeof window.__replayUpdate === "function") {
+        window.__replayUpdate(null, null, null);
+      }
+      pushBridge(null);
     }
+  }
+
+  // ---------- 桥接：把关节角推给 CC:Tweaked 中继服务 ----------
+  const BRIDGE_URL = "http://127.0.0.1:8765/update";
+  let bridgeLast = 0;
+  let bridgeOk = 0;
+  let bridgeErr = 0;
+
+  function bridgeEnabled() {
+    return window.__bridgeOn === true ||
+      (document.getElementById("bridgeEnable") || {}).checked === true;
+  }
+
+  function setBridgeStatus(text, kind) {
+    const el = document.getElementById("bridgeStatus");
+    if (!el) return;
+    el.textContent = text;
+    el.dataset.kind = kind || "";
+  }
+
+  function pushBridge(ang) {
+    if (!bridgeEnabled()) return;
+    const now = performance.now();
+    if (now - bridgeLast < 33) return;   // 约 30Hz
+    bridgeLast = now;
+
+    const payload = { hand: !!ang, source: "webcam-mediapipe", fingers: {} };
+    if (ang) {
+      for (const name of Object.keys(FINGER_DEFS)) {
+        const d = ang[name];
+        payload.fingers[name] = {
+          flex: d ? d.flex : 0,
+          mcp: d ? d.angles[0] : 0,
+          pip: d ? d.angles[1] : 0,
+          dip: d ? d.angles[2] : 0,
+        };
+      }
+    }
+
+    fetch(BRIDGE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        bridgeOk++;
+        setBridgeStatus("已连接 · " + bridgeOk + " 帧", "ok");
+      })
+      .catch(() => {
+        bridgeErr++;
+        if (bridgeErr % 30 === 1) {
+          setBridgeStatus("未连接（先启动 bridge_server.py）", "err");
+        }
+      });
   }
 
   function stopCamera() {

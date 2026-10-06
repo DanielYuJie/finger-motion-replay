@@ -1,0 +1,259 @@
+.game-app {
+  max-width: 1280px;
+}
+
+.game-main {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .game-main {
+    grid-template-columns: 1fr;
+  }
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.game-stage {
+  min-width: 0;
+}
+
+.game-canvas-wrap {
+  position: relative;
+  height: min(72vh, 640px);
+  min-height: 420px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #0a0e12;
+  box-shadow: var(--shadow);
+}
+
+#gameCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* 小窗摄像头 */
+.cam-pip {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 180px;
+  height: 120px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(61, 156, 240, 0.45);
+  background: #000;
+  z-index: 5;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.cam-pip video,
+.cam-pip canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cam-pip video.mirrored {
+  transform: scaleX(-1);
+}
+
+.cam-pip canvas.mirrored {
+  transform: scaleX(-1);
+}
+
+.pip-label {
+  position: absolute;
+  left: 6px;
+  bottom: 4px;
+  z-index: 2;
+  font-size: 0.68rem;
+  color: #cfe7ff;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* HUD */
+.hud {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  gap: 8px;
+  z-index: 4;
+}
+
+.hud-item {
+  min-width: 72px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(15, 20, 25, 0.72);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(6px);
+}
+
+.hud-label {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+}
+
+.hud-item b {
+  font-family: var(--mono);
+  font-size: 1.25rem;
+  color: var(--joint);
+}
+
+/* overlay */
+.game-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 14, 18, 0.72);
+  backdrop-filter: blur(4px);
+  transition: opacity 0.25s;
+}
+
+.game-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.overlay-card {
+  width: min(420px, 90%);
+  text-align: center;
+  padding: 28px 24px;
+  border-radius: 16px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.overlay-card h2 {
+  margin: 0 0 10px;
+  font-size: 1.35rem;
+}
+
+.overlay-card p {
+  margin: 0 0 18px;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  line-height: 1.65;
+}
+
+.overlay-card b {
+  color: var(--warning);
+}
+
+.overlay-tip {
+  margin: 12px 0 0 !important;
+  font-size: 0.78rem !important;
+  color: var(--text-dim) !important;
+}
+
+/* gestures */
+.gesture-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gesture {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+.gesture-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  font-size: 1.15rem;
+  flex-shrink: 0;
+}
+
+.gesture strong {
+  display: block;
+  font-size: 0.85rem;
+  margin-bottom: 2px;
+}
+
+.gesture p {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+
+.game-panel .actions {
+  margin-top: 4px;
+}
+
+/* signal */
+.angles.compact .sig-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.angles.compact .sig-row b {
+  font-family: var(--mono);
+  color: var(--joint);
+}
+
+.sig-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  margin: 8px 0;
+}
+
+.sig-bar-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--success), var(--warning));
+  transition: width 0.08s linear;
+}
+
+.sig-hint {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+.header-actions .btn.mini {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
