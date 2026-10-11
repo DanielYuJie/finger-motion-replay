@@ -92,6 +92,26 @@
 
   const WRIST = 0; // landmark 0，近端关节的掌骨方向参考点
 
+  // ---------- 稳定性参数（想更跟手就调大，想更稳就调小） ----------
+  // One Euro 滤波器：静止时强抑制抖动，快速移动时自动放宽以保持跟手。
+  // minCutoff 越小越稳；beta 越大越跟手；dCutoff 作用于速度估计。
+  const LM_MIN_CUTOFF = 1.5;
+  const LM_BETA = 0.04;
+  const LM_D_CUTOFF = 1.0;
+  // 关节角也用 One Euro：静止时强平滑，动作时自动跟手。
+  // 早先版本用的是「指数平滑 + 死区」，但死区会把数值卡住不放，实测在保持
+  // 静止姿势时能偏离真值约 7°，对驱动机械手来说不可接受，故改为无偏的 One Euro。
+  const ANGLE_MIN_CUTOFF = 1.2;
+  const ANGLE_BETA = 0.03;
+  // 显示层滞回：只有变化超过阈值才更新界面文字与刻度，消除读数抖动。
+  // 只作用于显示，3D 复现与 MC 桥接用的仍是真实平滑值。
+  const DISPLAY_DEADBAND = 0.4;
+  const FLEX_KEY = "__flex"; // 综合弯曲角在显示滞回表里的键
+  // 丢失手之后仍保持上一帧画面的宽限时间（毫秒），避免单帧漏检造成闪烁
+  const MISS_GRACE_MS = 250;
+  // 重新出现且间隔超过该时间就重置滤波器，避免从旧位置拖影过来
+  const REACQUIRE_RESET_MS = 700;
+
   let stream = null;
   let handLandmarker = null;
   let landmarkerReady = false;
@@ -100,6 +120,11 @@
   let lastVideoTime = -1;
   let detectTimestamp = 0;
   let lastLandmarks = null;
+  // 稳定性状态：最近一次看到手的时间、上一帧平滑结果、平滑后的关节角、推理耗时均值
+  let lastSeenAt = 0;
+  let lastSmoothed = null;
+  let lastAngles = null;
+  let inferAvg = null;
   let fpsFrames = 0;
   let fpsLastTime = performance.now();
   let fpsRafId = 0;
@@ -177,16 +202,20 @@
       const data = fingerAngles && fingerAngles[name];
       def.joints.forEach((joint, idx) => {
         const el = $(name + "-" + joint);
+        const key = name + "-" + joint;
         const deg = data ? data.angles[idx] : null;
-        if (el) el.textContent = deg === null ? "—" : fmtAngle(deg);
-        // 驱动刻度条：满量程按 120° 屈曲
+        // 显示层滞回：读数与刻度都用「稳定后」的值，避免抖动。
+        // 注意 deg 本身（真实平滑值）不受影响，MC 桥接与 3D 仍用它。
+        const shown = deg === null ? null : shownValue(key, deg);
+        if (el) el.textContent = shown === null ? "—" : fmtAngle(shown);
         const row = el && el.closest(".angle-row");
         if (row) {
           row.style.setProperty(
             "--pct",
-            deg === null ? "0" : Math.min(100, (deg / 120) * 100).toFixed(1)
+            shown === null ? "0" : Math.min(100, (shown / 120) * 100).toFixed(1)
           );
         }
+        if (deg === null) lastShown.delete(key);
       });
     }
 
@@ -202,20 +231,20 @@
     if (!fingerAngles) {
       focusAngleEl.textContent = "—";
       setGauge(0);
+      lastShown.delete(FLEX_KEY);
       return;
     }
 
     // flex 本身就是 0–100 的归一化弯曲量，可直接当作环形表的百分比
+    let flex;
     if (focusName) {
-      const flex = fingerAngles[focusName].flex;
-      focusAngleEl.textContent = fmtAngle(flex);
-      setGauge(flex);
+      flex = fingerAngles[focusName].flex;
     } else {
-      const sum =
-        Object.values(fingerAngles).reduce((acc, d) => acc + d.flex, 0) / 5;
-      focusAngleEl.textContent = fmtAngle(sum);
-      setGauge(sum);
+      flex = Object.values(fingerAngles).reduce((acc, d) => acc + d.flex, 0) / 5;
     }
+    const shownFlex = shownValue(FLEX_KEY, flex);
+    focusAngleEl.textContent = fmtAngle(shownFlex);
+    setGauge(shownFlex);
   }
 
   function setGauge(pct) {
@@ -235,7 +264,126 @@
     overlay.style.height = rect.height + "px";
   }
 
-  function drawOverlay(landmarksList) {
+  // ---------- One Euro 滤波器 ----------
+  // 参考 Casiez et al. 2012：截止频率随速度自适应，兼顾「静止不抖」与「动起来跟手」。
+  function OneEuro(minCutoff, beta, dCutoff) {
+    this.minCutoff = minCutoff;
+    this.beta = beta;
+    this.dCutoff = dCutoff;
+    this.reset();
+  }
+  OneEuro.prototype.reset = function () {
+    this.tPrev = null;
+    this.xPrev = null;
+    this.xHat = null;
+    this.dxHat = 0;
+  };
+  OneEuro.prototype.alpha = function (cutoff, dt) {
+    const tau = 1 / (2 * Math.PI * cutoff);
+    return 1 / (1 + tau / dt);
+  };
+  OneEuro.prototype.filter = function (x, tMs) {
+    if (this.tPrev === null) {
+      this.tPrev = tMs;
+      this.xPrev = x;
+      this.xHat = x;
+      this.dxHat = 0;
+      return x;
+    }
+    let dt = (tMs - this.tPrev) / 1000;
+    if (!(dt > 0)) dt = 1 / 60;
+    dt = Math.min(dt, 0.25); // 掉帧时不要用超长 dt 污染速度估计
+
+    const dx = (x - this.xPrev) / dt;
+    const aD = this.alpha(this.dCutoff, dt);
+    this.dxHat = aD * dx + (1 - aD) * this.dxHat;
+
+    const cutoff = this.minCutoff + this.beta * Math.abs(this.dxHat);
+    const a = this.alpha(cutoff, dt);
+    this.xHat = a * x + (1 - a) * this.xHat;
+
+    this.tPrev = tMs;
+    this.xPrev = x;
+    return this.xHat;
+  };
+
+  // 21 个关节点 × 3 轴，各自独立滤波
+  const lmFilters = [];
+  for (let i = 0; i < 21; i++) {
+    lmFilters.push({
+      x: new OneEuro(LM_MIN_CUTOFF, LM_BETA, LM_D_CUTOFF),
+      y: new OneEuro(LM_MIN_CUTOFF, LM_BETA, LM_D_CUTOFF),
+      z: new OneEuro(LM_MIN_CUTOFF, LM_BETA, LM_D_CUTOFF),
+    });
+  }
+  function resetLandmarkFilters() {
+    for (const f of lmFilters) {
+      f.x.reset();
+      f.y.reset();
+      f.z.reset();
+    }
+  }
+
+  function smoothLandmarks(hand, tMs) {
+    const out = new Array(hand.length);
+    for (let i = 0; i < hand.length; i++) {
+      const p = hand[i];
+      const f = lmFilters[i];
+      if (!p) { out[i] = { x: 0, y: 0, z: 0 }; continue; }
+      const x = f.x.filter(p.x, tMs);
+      const y = f.y.filter(p.y, tMs);
+      const z = typeof p.z === "number" ? f.z.filter(p.z, tMs) : 0;
+      out[i] = { x: x, y: y, z: z };
+    }
+    return out;
+  }
+
+  // ---------- 关节角：One Euro 平滑（无偏） ----------
+  const angleFilters = {};
+  function angleFilterFor(name) {
+    let f = angleFilters[name];
+    if (!f) {
+      const mk = () => new OneEuro(ANGLE_MIN_CUTOFF, ANGLE_BETA, LM_D_CUTOFF);
+      f = angleFilters[name] = { a: [mk(), mk(), mk()], flex: mk() };
+    }
+    return f;
+  }
+
+  // 显示层滞回状态：只影响读数与该关节的刻度条，不影响对外输出的角度
+  const lastShown = new Map();
+  function shownValue(key, value) {
+    const prev = lastShown.get(key);
+    if (prev === undefined || Math.abs(value - prev) >= DISPLAY_DEADBAND) {
+      lastShown.set(key, value);
+      return value;
+    }
+    return prev;
+  }
+
+  function resetAngleState() {
+    for (const k of Object.keys(angleFilters)) delete angleFilters[k];
+    lastShown.clear();
+  }
+
+  function smoothAngles(raw, tMs) {
+    const t = tMs === undefined ? performance.now() : tMs;
+    const out = {};
+    for (const name of Object.keys(FINGER_DEFS)) {
+      const r = raw[name];
+      const f = angleFilterFor(name);
+      out[name] = {
+        angles: [
+          f.a[0].filter(r.angles[0], t),
+          f.a[1].filter(r.angles[1], t),
+          f.a[2].filter(r.angles[2], t),
+        ],
+        flex: f.flex.filter(r.flex, t),
+      };
+    }
+    return out;
+  }
+
+  function drawOverlay(landmarksList, fingerAnglesIn) {
     const ctx = overlay.getContext("2d");
     const w = overlay.width;
     const h = overlay.height;
@@ -243,6 +391,7 @@
 
     if (!landmarksList || landmarksList.length === 0) {
       handBadge.hidden = true;
+      if (trail.size) trail.clear();
       updateAngleUI(null);
       return;
     }
@@ -284,7 +433,8 @@
         ctx.stroke();
       }
 
-      const fingerAngles = computeFingerAngles(landmarks);
+      // 平滑后的关节角由调用方算好传入，避免同一帧重复计算、数值不一致
+      const fingerAngles = fingerAnglesIn || computeFingerAngles(landmarks);
 
       if (showAnglesCheck.checked) {
         ctx.font = 11 * dpr + "px Consolas, monospace";
@@ -445,6 +595,51 @@
     }
   }
 
+  // 把一帧检测结果走完「平滑 → 绘制 → 3D → 桥接」的完整路径。
+  // hand 为 21 点数组，null 表示这一帧没检测到手。
+  function handleDetection(hand, now) {
+    if (hand && hand.length >= 21) {
+      // 隔了很久才重新出现：重置滤波器，避免从旧位置拖影过来
+      if (lastSeenAt && now - lastSeenAt > REACQUIRE_RESET_MS) {
+        resetLandmarkFilters();
+        resetAngleState();
+      }
+      lastSeenAt = now;
+
+      const smoothed = smoothLandmarks(hand, now);
+      const angles = smoothAngles(computeFingerAngles(smoothed), now);
+      lastSmoothed = smoothed;
+      lastAngles = angles;
+
+      drawOverlay([smoothed], angles);
+
+      const focus = fingerSelect.value;
+      const focusName = focus === "-1" ? null : FINGER_BY_INDEX[focus];
+      if (typeof window.__replayUpdate === "function") {
+        window.__replayUpdate(smoothed, angles, focusName);
+      }
+      pushBridge(angles);
+      return;
+    }
+
+    // 没检测到：宽限期内保持上一帧画面与读数，杜绝单帧漏检造成的闪烁
+    const gap = lastSeenAt ? now - lastSeenAt : Infinity;
+    if (gap < MISS_GRACE_MS) return;
+
+    if (lastSmoothed) {
+      lastSmoothed = null;
+      lastAngles = null;
+      lastSeenAt = 0;
+      resetLandmarkFilters();
+      resetAngleState();
+      drawOverlay(null, null);
+      if (typeof window.__replayUpdate === "function") {
+        window.__replayUpdate(null, null, null);
+      }
+      pushBridge(null);
+    }
+  }
+
   function detectLoop() {
     rafId = requestAnimationFrame(detectLoop);
     if (!stream || !landmarkerReady || !handLandmarker) return;
@@ -460,26 +655,13 @@
       console.warn("[mc] detect error", err);
       return;
     }
-    inferMsEl.textContent = (performance.now() - t0).toFixed(0) + " ms";
-    const lms = result && result.landmarks ? result.landmarks : [];
-    drawOverlay(lms);
+    // 推理耗时也做轻度平滑，避免读数来回跳
+    const infer = performance.now() - t0;
+    inferAvg = inferAvg === null ? infer : inferAvg + 0.15 * (infer - inferAvg);
+    inferMsEl.textContent = inferAvg.toFixed(0) + " ms";
 
-    // 驱动 3D 复现（replay3d.js 提供）
-    if (lms.length) {
-      const first = lms[0];
-      const ang = computeFingerAngles(first);
-      const focus = fingerSelect.value;
-      const focusName = focus === "-1" ? null : FINGER_BY_INDEX[focus];
-      if (typeof window.__replayUpdate === "function") {
-        window.__replayUpdate(first, ang, focusName);
-      }
-      pushBridge(ang);
-    } else {
-      if (typeof window.__replayUpdate === "function") {
-        window.__replayUpdate(null, null, null);
-      }
-      pushBridge(null);
-    }
+    const raw = result && result.landmarks ? result.landmarks[0] : null;
+    handleDetection(raw && raw.length >= 21 ? raw : null, performance.now());
   }
 
   // ---------- 桥接：把关节角推给 CC:Tweaked 中继服务 ----------
@@ -551,6 +733,12 @@
     video.srcObject = null;
     lastVideoTime = -1;
     lastLandmarks = null;
+    lastSeenAt = 0;
+    lastSmoothed = null;
+    lastAngles = null;
+    inferAvg = null;
+    resetLandmarkFilters();
+    resetAngleState();
     trail.clear();
     placeholder.classList.remove("hidden");
     handBadge.hidden = true;
@@ -803,7 +991,8 @@
         Boolean(focusName) && card.dataset.finger === focusName
       );
     });
-    if (lastLandmarks) updateAngleUI(computeFingerAngles(lastLandmarks));
+    // 用缓存的平滑角度重绘，避免绕开平滑直接重算导致读数跳变
+    if (lastAngles) updateAngleUI(lastAngles);
   });
 
   video.addEventListener("loadedmetadata", function () {
@@ -834,4 +1023,31 @@
   // 供自检/联调使用：可传入 21 个 landmark 直接验算关节角，或直接渲染一组角度
   window.__mcAngles = computeFingerAngles;
   window.__mcRender = updateAngleUI;
+  // 供自检使用：暴露平滑链路与一帧注入入口，便于量化抖动抑制效果
+  window.__mcStability = {
+    reset: function () {
+      resetLandmarkFilters();
+      resetAngleState();
+      lastSeenAt = 0;
+      lastSmoothed = null;
+      lastAngles = null;
+    },
+    filterFrame: function (hand, tMs) {
+      return smoothLandmarks(hand, tMs === undefined ? performance.now() : tMs);
+    },
+    smoothAngles: smoothAngles,
+    computeAngles: computeFingerAngles,
+    feedFrame: function (hand, tMs) {
+      handleDetection(hand, tMs === undefined ? performance.now() : tMs);
+    },
+    constants: {
+      LM_MIN_CUTOFF: LM_MIN_CUTOFF,
+      LM_BETA: LM_BETA,
+      ANGLE_MIN_CUTOFF: ANGLE_MIN_CUTOFF,
+      ANGLE_BETA: ANGLE_BETA,
+      DISPLAY_DEADBAND: DISPLAY_DEADBAND,
+      MISS_GRACE_MS: MISS_GRACE_MS,
+      REACQUIRE_RESET_MS: REACQUIRE_RESET_MS,
+    },
+  };
 })();
