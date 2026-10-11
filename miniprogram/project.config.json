@@ -1,0 +1,17 @@
+{
+  "miniprogramRoot": "./",
+  "projectname": "finger-motion-capture",
+  "description": "手指运动采集 · 视觉主端（小程序版）",
+  "appid": "PUT_YOUR_APPID_HERE",
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": false,
+    "useCompilerPlugins": false
+  },
+  "compileType": "miniprogram",
+  "libVersion": "2.28.0",
+  "condition": {}
+}

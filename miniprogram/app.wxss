@@ -1,0 +1,103 @@
+/* app.wxss — 与视觉主端同一套设计语言（深色「应用」主题）
+   令牌直接沿用 tokens.css 的取值，单位换成 rpx。 */
+
+page {
+  /* 表面与文字 */
+  --bg: #0b0f14;
+  --surface: #111721;
+  --surface-2: #161e2a;
+  --surface-3: #1c2634;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.16);
+  --text: #e8eef6;
+  --text-2: #a9b8c9;
+  --text-3: #7d8fa3;
+
+  /* 品牌与功能色 */
+  --brand: #c97a4b;
+  --brand-soft: rgba(201, 122, 75, 0.12);
+  --accent: #3d9cf0;
+  --accent-2: #63b4ff;
+  --accent-soft: rgba(61, 156, 240, 0.12);
+  --accent-line: rgba(61, 156, 240, 0.35);
+  --ok: #3ecf8e;
+  --warn: #f0b429;
+  --danger: #f2604f;
+  --data: #5ad1ff;
+
+  /* 材质 */
+  --glass: rgba(255, 255, 255, 0.035);
+  --hairline: rgba(255, 255, 255, 0.09);
+  --meter-track: rgba(255, 255, 255, 0.07);
+  --canvas-bg: #080c11;
+
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", sans-serif;
+  font-size: 28rpx;
+  line-height: 1.6;
+}
+
+/* 玻璃面板 —— 与网页端 .frame/.block/.pane 同一质感 */
+.pane {
+  position: relative;
+  border: 1rpx solid var(--hairline);
+  border-radius: 28rpx;
+  background: linear-gradient(180deg, var(--glass), transparent 42%), var(--surface);
+  padding: 28rpx;
+  margin-bottom: 24rpx;
+}
+
+.pane-head {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.tick {
+  width: 6rpx;
+  height: 28rpx;
+  border-radius: 4rpx;
+  margin-right: 16rpx;
+  background: linear-gradient(180deg, var(--accent), var(--brand));
+}
+
+.pane-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.pane-note {
+  margin-left: auto;
+  font-size: 22rpx;
+  color: var(--text-3);
+}
+
+.mono {
+  font-family: "SF Mono", Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 88rpx;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1rpx solid var(--line-strong);
+}
+
+.btn.primary {
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--accent-2), var(--accent));
+}
+
+.btn[disabled] {
+  opacity: 0.45;
+}

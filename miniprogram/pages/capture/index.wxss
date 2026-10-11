@@ -1,0 +1,215 @@
+/* pages/capture/index.wxss */
+
+.page {
+  padding: 24rpx 24rpx 60rpx;
+}
+
+/* ---------- 状态条 ---------- */
+.statusbar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 24rpx;
+}
+
+.brand { display: flex; align-items: center; }
+
+.brand-mark {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 18rpx;
+  margin-right: 18rpx;
+  background: linear-gradient(145deg, var(--accent), var(--brand));
+}
+
+.brand-text { display: flex; flex-direction: column; }
+.brand-title { font-size: 30rpx; font-weight: 600; }
+.brand-sub { font-size: 22rpx; color: var(--text-3); }
+
+.status {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  padding: 8rpx 20rpx;
+  border-radius: 999rpx;
+  border: 1rpx solid var(--line);
+  background: var(--surface-2);
+  font-size: 22rpx;
+  color: var(--text-2);
+}
+.status .dot {
+  width: 12rpx; height: 12rpx;
+  border-radius: 50%;
+  margin-right: 10rpx;
+  background: var(--text-3);
+}
+.status--live { color: var(--ok); border-color: rgba(62, 207, 142, 0.4); }
+.status--live .dot { background: var(--ok); }
+.status--loading { color: var(--warn); border-color: rgba(240, 180, 41, 0.4); }
+.status--loading .dot { background: var(--warn); }
+.status--error { color: var(--danger); border-color: rgba(242, 96, 79, 0.4); }
+.status--error .dot { background: var(--danger); }
+
+/* ---------- 取景区 ---------- */
+.frame {
+  border: 1rpx solid var(--hairline);
+  border-radius: 28rpx;
+  padding: 20rpx;
+  margin-bottom: 24rpx;
+  background: linear-gradient(180deg, var(--glass), transparent 42%), var(--surface);
+}
+
+.viewport {
+  position: relative;
+  width: 100%;
+  height: 620rpx;
+  border-radius: 20rpx;
+  overflow: hidden;
+  background: var(--canvas-bg);
+}
+
+.cam { width: 100%; height: 100%; }
+
+.overlay {
+  position: absolute;
+  left: 0; top: 0;
+  width: 100%; height: 100%;
+}
+
+/* 取景器四角 */
+.vf-corners { position: absolute; left: 24rpx; right: 24rpx; top: 24rpx; bottom: 24rpx; }
+.vf-corners .c {
+  position: absolute;
+  width: 44rpx; height: 44rpx;
+  border: 3rpx solid rgba(61, 156, 240, 0.7);
+}
+.vf-corners .c1 { left: 0; top: 0; border-right: 0; border-bottom: 0; border-radius: 10rpx 0 0 0; }
+.vf-corners .c2 { right: 0; top: 0; border-left: 0; border-bottom: 0; border-radius: 0 10rpx 0 0; }
+.vf-corners .c3 { left: 0; bottom: 0; border-right: 0; border-top: 0; border-radius: 0 0 0 10rpx; }
+.vf-corners .c4 { right: 0; bottom: 0; border-left: 0; border-top: 0; border-radius: 0 0 10rpx 0; }
+
+.placeholder {
+  position: absolute;
+  left: 0; right: 0; top: 0; bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.ph-title { font-size: 28rpx; color: var(--text-2); }
+.ph-hint { font-size: 24rpx; color: var(--text-3); margin-top: 12rpx; }
+
+.hand-badge {
+  position: absolute;
+  left: 24rpx; top: 24rpx;
+  padding: 6rpx 20rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  color: #fff;
+  background: rgba(62, 207, 142, 0.88);
+}
+
+/* 仪器读数条 */
+.instruments {
+  display: flex;
+  margin-top: 20rpx;
+  border: 1rpx solid var(--hairline);
+  border-radius: 18rpx;
+  overflow: hidden;
+}
+.instrument {
+  flex: 1;
+  padding: 16rpx 18rpx;
+  border-left: 1rpx solid var(--hairline);
+}
+.instrument:first-child { border-left: 0; }
+.instrument .k {
+  display: block;
+  font-size: 20rpx;
+  letter-spacing: 2rpx;
+  color: var(--text-3);
+  margin-bottom: 4rpx;
+}
+.instrument .v { display: block; font-size: 28rpx; color: var(--data); }
+
+/* ---------- 控制行 ---------- */
+.row {
+  display: flex;
+  align-items: center;
+  padding: 18rpx 0;
+  border-top: 1rpx solid var(--line);
+}
+.row:first-of-type { border-top: 0; }
+.row-label { font-size: 26rpx; color: var(--text-2); }
+.picker {
+  margin-left: auto;
+  padding: 10rpx 24rpx;
+  border-radius: 12rpx;
+  border: 1rpx solid var(--line-strong);
+  background: var(--surface-2);
+  font-size: 26rpx;
+}
+.row switch { margin-left: auto; }
+
+.actions { display: flex; margin-top: 24rpx; }
+.actions .btn { flex: 1; }
+.actions .btn:first-child { margin-right: 20rpx; }
+
+/* ---------- 关节角 ---------- */
+.gauge-wrap {
+  position: relative;
+  width: 260rpx;
+  height: 260rpx;
+  margin: 10rpx auto 30rpx;
+}
+.gauge { width: 260rpx; height: 260rpx; }
+.gauge-label {
+  position: absolute;
+  left: 0; right: 0; top: 0; bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.gauge-val { font-size: 48rpx; color: var(--text); }
+.gauge-cap { font-size: 20rpx; letter-spacing: 3rpx; color: var(--text-3); }
+
+.angle-card {
+  border: 1rpx solid var(--hairline);
+  border-radius: 18rpx;
+  padding: 18rpx 22rpx;
+  margin-bottom: 14rpx;
+  background: linear-gradient(180deg, var(--glass), transparent);
+}
+.angle-card.focused {
+  border-color: var(--accent-line);
+  background: linear-gradient(180deg, var(--accent-soft), transparent);
+}
+
+.angle-card__head { display: flex; align-items: baseline; margin-bottom: 12rpx; }
+.angle-card__name { font-size: 26rpx; color: var(--text-2); }
+.angle-card__tag { margin-left: auto; font-size: 20rpx; color: var(--text-3); }
+
+.angle-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10rpx;
+}
+.angle-row .k { width: 90rpx; font-size: 20rpx; color: var(--text-3); }
+
+.meter {
+  flex: 1;
+  height: 8rpx;
+  border-radius: 999rpx;
+  background: var(--meter-track);
+  overflow: hidden;
+  margin: 0 20rpx;
+}
+.meter-fill {
+  height: 100%;
+  border-radius: 999rpx;
+  background: linear-gradient(90deg, rgba(61, 156, 240, 0.45), var(--accent));
+}
+
+.angle-row .v { width: 110rpx; text-align: right; font-size: 26rpx; color: var(--data); }
+
+.tip { display: block; font-size: 24rpx; color: var(--text-3); margin-bottom: 10rpx; }

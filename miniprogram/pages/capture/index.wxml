@@ -1,0 +1,133 @@
+<!-- pages/capture/index.wxml — 视觉主端（小程序版） -->
+<view class="page">
+
+  <!-- 状态条 -->
+  <view class="statusbar">
+    <view class="brand">
+      <view class="brand-mark"></view>
+      <view class="brand-text">
+        <text class="brand-title">手指运动采集</text>
+        <text class="brand-sub">视觉主端 · 关节角</text>
+      </view>
+    </view>
+    <view class="status status--{{statusState}}">
+      <view class="dot"></view>
+      <text>{{status}}</text>
+    </view>
+  </view>
+
+  <!-- 取景区 -->
+  <view class="frame">
+    <view class="viewport">
+      <camera
+        wx:if="{{running && showCameraPreview}}"
+        class="cam"
+        device-position="front"
+        resolution="medium"
+        flash="off"
+        frame-size="medium"
+        bindstop="onCameraStop" />
+
+      <!-- 骨架覆盖层 -->
+      <canvas type="2d" id="overlay" class="overlay"></canvas>
+
+      <view class="vf-corners">
+        <view class="c c1"></view><view class="c c2"></view>
+        <view class="c c3"></view><view class="c c4"></view>
+      </view>
+
+      <view class="placeholder" wx:if="{{!running}}">
+        <text class="ph-title">点击「开启摄像头」开始采集</text>
+        <text class="ph-hint">将手放入画面，即可看到关节点与关节角</text>
+      </view>
+
+      <view class="hand-badge" wx:if="{{handVisible}}">已检测到手</view>
+    </view>
+
+    <!-- 仪器读数条 -->
+    <view class="instruments">
+      <view class="instrument">
+        <text class="k">帧率</text><text class="v mono">{{fps}}</text>
+      </view>
+      <view class="instrument">
+        <text class="k">推理</text><text class="v mono">{{inferMs}}</text>
+      </view>
+      <view class="instrument">
+        <text class="k">关键点</text><text class="v mono">{{pointCount}}</text>
+      </view>
+      <view class="instrument">
+        <text class="k">基础库</text><text class="v mono">{{sdkVersion}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 控制 -->
+  <view class="pane">
+    <view class="pane-head">
+      <view class="tick"></view>
+      <text class="pane-title">采集控制</text>
+      <text class="pane-note">VisionKit · 本机推理</text>
+    </view>
+
+    <view class="row">
+      <text class="row-label">重点手指</text>
+      <picker mode="selector" range="{{fingerLabels}}" value="{{fingerIndex}}" bindchange="onFingerChange">
+        <view class="picker">{{fingerLabels[fingerIndex]}}</view>
+      </picker>
+    </view>
+
+    <view class="row">
+      <text class="row-label">镜像显示</text>
+      <switch checked="{{mirror}}" color="#3d9cf0" bindchange="onMirrorChange" />
+    </view>
+
+    <view class="row">
+      <text class="row-label">显示关节角</text>
+      <switch checked="{{showAngles}}" color="#3d9cf0" bindchange="onShowAnglesChange" />
+    </view>
+
+    <view class="actions">
+      <button class="btn primary" bindtap="onStart" disabled="{{running}}">开启摄像头</button>
+      <button class="btn" bindtap="onStop" disabled="{{!running}}">关闭</button>
+    </view>
+  </view>
+
+  <!-- 关节角 -->
+  <view class="pane">
+    <view class="pane-head">
+      <view class="tick"></view>
+      <text class="pane-title">关节角</text>
+      <text class="pane-note">屈曲角 · 0° 为伸直</text>
+    </view>
+
+    <view class="gauge-wrap">
+      <canvas type="2d" id="gauge" class="gauge"></canvas>
+      <view class="gauge-label">
+        <text class="gauge-val mono">{{focusFlex}}</text>
+        <text class="gauge-cap">综合弯曲</text>
+      </view>
+    </view>
+
+    <view class="angle-card" wx:for="{{angleCards}}" wx:key="key">
+      <view class="angle-card__head">
+        <text class="angle-card__name">{{item.label}}</text>
+        <text class="angle-card__tag mono">{{item.tag}}</text>
+      </view>
+      <view class="angle-row" wx:for="{{item.joints}}" wx:for-item="j" wx:key="k">
+        <text class="k mono">{{j.k}}</text>
+        <view class="meter"><view class="meter-fill" style="width:{{j.pct}}%"></view></view>
+        <text class="v mono">{{j.v}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 提示 / 错误 -->
+  <view class="pane" wx:if="{{tips.length}}">
+    <view class="pane-head">
+      <view class="tick"></view>
+      <text class="pane-title">提示</text>
+    </view>
+    <text class="tip" wx:for="{{tips}}" wx:key="*this">{{item}}</text>
+  </view>
+
+</view>

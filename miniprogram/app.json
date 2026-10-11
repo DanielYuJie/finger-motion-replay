@@ -1,0 +1,19 @@
+{
+  "pages": [
+    "pages/capture/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "手指运动采集",
+    "navigationBarBackgroundColor": "#0b0f14",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#0b0f14",
+    "backgroundTextStyle": "dark"
+  },
+  "permission": {
+    "scope.camera": {
+      "desc": "用于手部关键点识别与关节角采集，画面仅在本机处理、不上传"
+    }
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}
