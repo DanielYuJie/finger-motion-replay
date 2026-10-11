@@ -1,0 +1,332 @@
+/* ==========================================================================
+   app.css — layout for the live tool (capture.html). Dark "app" theme.
+   Depends on tokens.css + base.css + components.css.
+   ========================================================================== */
+
+.app-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: var(--sp-5);
+  align-items: start;
+  margin-top: var(--sp-5);
+}
+@media (max-width: 1100px) {
+  .app-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* --------------------------------------------------------------------------
+   Camera stage
+   -------------------------------------------------------------------------- */
+.stage { min-width: 0; }
+
+.viewport {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  background: var(--canvas-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-2);
+}
+
+.viewport video,
+.viewport canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.viewport canvas { pointer-events: none; }
+
+video.mirrored,
+canvas.mirrored { transform: scaleX(-1); }
+
+.placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  text-align: center;
+  color: var(--text-3);
+  padding: var(--sp-5);
+  background: radial-gradient(60% 60% at 50% 45%, var(--surface) 0%, transparent 100%);
+}
+.placeholder-icon { color: var(--accent); opacity: 0.75; margin-bottom: var(--sp-2); }
+.placeholder p { margin: 0; font-size: var(--fs-md); color: var(--text-2); }
+.placeholder .hint { font-size: var(--fs-sm); color: var(--text-3); }
+
+.hand-badge {
+  position: absolute;
+  top: var(--sp-3);
+  left: var(--sp-3);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 5px 12px;
+  font-size: var(--fs-sm);
+  color: #fff;
+  background: color-mix(in srgb, var(--ok) 88%, #000);
+  border-radius: var(--r-pill);
+  box-shadow: var(--shadow-2);
+}
+.hand-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+/* readout strip under the video */
+.meta {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--sp-3);
+  margin-top: var(--sp-4);
+}
+.meta-item {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 10px var(--sp-3);
+  min-width: 0;
+}
+.meta-item .label {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  letter-spacing: 0.06em;
+  margin-bottom: 3px;
+}
+.meta-item .value {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--fs-md);
+  color: var(--data);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 560px) {
+  .meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* --------------------------------------------------------------------------
+   3D replay block
+   -------------------------------------------------------------------------- */
+.replay-block {
+  margin-top: var(--sp-5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: var(--sp-4);
+  box-shadow: var(--shadow-1);
+}
+.replay-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-3);
+}
+.replay-head h2 { font-size: var(--fs-md); }
+.replay-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+.replay-hint { font-size: var(--fs-xs); color: var(--text-3); }
+
+.replay-wrap {
+  position: relative;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--surface-2), var(--canvas-bg));
+  border: 1px solid var(--line);
+}
+#replayCanvas { display: block; width: 100%; height: 300px; touch-action: none; }
+
+.replay-legend {
+  position: absolute;
+  left: var(--sp-3);
+  bottom: var(--sp-3);
+  display: flex;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  pointer-events: none;
+}
+.replay-legend .lg {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  padding: 3px 10px;
+  backdrop-filter: blur(6px);
+}
+.replay-legend .lg::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+.replay-legend .lg.lm::before { background: var(--data); }
+.replay-legend .lg.finger::before { background: var(--brand); }
+
+/* --------------------------------------------------------------------------
+   Side panel
+   -------------------------------------------------------------------------- */
+.panel { display: flex; flex-direction: column; gap: var(--sp-5); }
+
+.side-section { min-width: 0; }
+.side-section > h2 {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: var(--sp-3);
+}
+
+.side-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-2);
+}
+.side-actions .btn.wide { grid-column: 1 / -1; }
+
+/* bridge status chip */
+.bridge-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+.bridge-head h2 { margin: 0; }
+.bridge-state {
+  margin-left: auto;
+  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+  color: var(--text-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+.bridge-state[data-kind="ok"] {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 40%, transparent);
+  background: color-mix(in srgb, var(--ok) 10%, transparent);
+}
+.bridge-state[data-kind="err"] {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+.bridge-hint { font-size: var(--fs-sm); color: var(--text-3); margin: 0; }
+
+/* --------------------------------------------------------------------------
+   Joint angle readouts
+   -------------------------------------------------------------------------- */
+.angles-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+.angles-head h2 { margin: 0; }
+.angles-hint { margin-left: auto; font-size: var(--fs-xs); color: var(--text-3); }
+
+.angle-grid { display: flex; flex-direction: column; gap: var(--sp-2); }
+
+.angle-card {
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  padding: 10px var(--sp-3);
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+.angle-card.focused {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  box-shadow: var(--shadow-1);
+}
+
+.angle-name {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+.angle-card.focused .angle-name { color: var(--accent); }
+
+.angle-rows { display: flex; gap: var(--sp-4); flex-wrap: wrap; }
+.angle-rows .row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.angle-rows .row span {
+  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+  color: var(--text-3);
+  letter-spacing: 0.04em;
+}
+.angle-rows .row b {
+  font-family: var(--font-mono);
+  font-size: var(--fs-md);
+  font-variant-numeric: tabular-nums;
+  color: var(--data);
+}
+
+.selected-angle {
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+.selected-angle b {
+  font-family: var(--font-mono);
+  font-size: var(--fs-lg);
+  color: var(--brand);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------------------------------------
+   Tips / errors
+   -------------------------------------------------------------------------- */
+.tips h3 {
+  font-size: var(--fs-sm);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  font-weight: 600;
+  margin-bottom: var(--sp-2);
+}
+.tips ul { margin: 0; padding-left: 1.1em; }
+.tips li { font-size: var(--fs-sm); color: var(--text-3); margin-bottom: var(--sp-2); }
+
+/* auto-rotate toggle state */
+.btn.active {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+}

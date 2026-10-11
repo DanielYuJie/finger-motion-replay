@@ -1,0 +1,142 @@
+/* ==========================================================================
+   report.css — components unique to the technical report.
+   Everything shared (hero, figures, tables, cards, buttons, footer) comes from
+   doc.css / components.css; this file only holds the report's own devices.
+   ========================================================================== */
+
+/* ---------- headline stats ---------- */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--sp-3);
+  margin: var(--sp-6) 0 var(--sp-3);
+}
+@media (max-width: 820px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ---------- work timeline ---------- */
+.timeline {
+  position: relative;
+  margin: var(--sp-6) 0 var(--sp-3);
+  padding-left: var(--sp-6);
+}
+.timeline::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 6px;
+  bottom: 6px;
+  width: 1.5px;
+  background: linear-gradient(180deg, var(--brand), var(--line));
+}
+.tl-item { position: relative; padding: 0 0 var(--sp-5) 6px; }
+.tl-item::before {
+  content: "";
+  position: absolute;
+  left: -26px;
+  top: 7px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--brand);
+}
+.tl-item.done::before { background: var(--brand); }
+.tl-time {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.06em;
+  color: var(--brand);
+  margin-bottom: 3px;
+}
+.tl-title { font-weight: 600; font-size: var(--fs-base); margin-bottom: 3px; }
+.tl-desc { margin: 0; color: var(--text-3); font-size: var(--fs-md); }
+
+/* ---------- bar chart ---------- */
+.bars { margin: var(--sp-5) 0; }
+.bar-row {
+  display: grid;
+  grid-template-columns: 104px 1fr 74px;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+.bar-row .bl { font-size: var(--fs-md); color: var(--text-2); }
+.bar-track {
+  height: 14px;
+  background: var(--surface-2);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+}
+.bar-fill {
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, var(--brand), color-mix(in srgb, var(--brand) 65%, #fff));
+}
+.bar-fill.s { background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 65%, #fff)); }
+.bar-fill.g { background: linear-gradient(90deg, var(--warn), color-mix(in srgb, var(--warn) 65%, #fff)); }
+.bar-val {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.bars-note {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+}
+
+/* ---------- closing panel ---------- */
+.closing {
+  position: relative;
+  overflow: hidden;
+  margin-top: var(--sp-7);
+  padding: var(--sp-7) var(--sp-6);
+  border-radius: var(--r-lg);
+  background: linear-gradient(150deg, var(--hero-bg), var(--hero-bg-2));
+  color: var(--hero-text);
+}
+.closing::after {
+  content: "";
+  position: absolute;
+  right: -60px;
+  top: -60px;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--brand) 38%, transparent), transparent 70%);
+}
+.closing h2,
+.closing h3 {
+  position: relative;
+  z-index: 1;
+  font-family: var(--font-serif);
+  font-size: var(--fs-xl);
+  margin: 0 0 var(--sp-3);
+  color: var(--hero-text);
+}
+.closing p { position: relative; z-index: 1; color: var(--hero-muted); }
+.closing .steps {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--sp-3);
+  margin-top: var(--sp-5);
+}
+@media (max-width: 820px) { .closing .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.closing .step {
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid var(--hero-line);
+  border-radius: var(--r-sm);
+  padding: var(--sp-4);
+}
+.closing .step b {
+  display: block;
+  margin-bottom: 5px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: color-mix(in srgb, var(--brand) 55%, #fff);
+}
+.closing .step span { font-size: var(--fs-md); color: var(--hero-muted); }

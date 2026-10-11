@@ -1,288 +1,39 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="paper">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>技术报告 · 从灵巧手调研到硬件实现路径</title>
-<style>
-  /* ============ Design tokens ============ */
-  :root{
-    --paper:#f7f4ef;
-    --paper-2:#efeae1;
-    --ink:#16191f;
-    --ink-2:#3a4049;
-    --muted:#7d848f;
-    --line:#ded7cb;
-    --line-2:#e8e2d8;
-    --copper:#a8562c;
-    --copper-2:#c97a4b;
-    --steel:#3a5f7d;
-    --sage:#5c7a68;
-    --gold:#b08d3f;
-    --shadow:0 18px 50px rgba(22,25,31,.10);
-    --shadow-sm:0 6px 20px rgba(22,25,31,.07);
-    --serif:"Songti SC","Source Han Serif SC","Noto Serif SC",Georgia,"Times New Roman",serif;
-    --sans:"PingFang SC","HarmonyOS Sans SC","Microsoft YaHei",-apple-system,"Segoe UI",sans-serif;
-    --mono:"Cascadia Code","SF Mono",Consolas,ui-monospace,monospace;
-    --maxw:1080px;
-  }
-  *{box-sizing:border-box;}
-  html{scroll-behavior:smooth;}
-  body{
-    margin:0;
-    background:var(--paper);
-    color:var(--ink);
-    font-family:var(--sans);
-    font-size:16px;
-    line-height:1.75;
-    -webkit-font-smoothing:antialiased;
-  }
-  /* paper grain */
-  body::before{
-    content:"";
-    position:fixed;inset:0;
-    pointer-events:none;z-index:0;opacity:.5;
-    background-image:
-      radial-gradient(rgba(22,25,31,.035) 1px,transparent 1px),
-      radial-gradient(rgba(22,25,31,.02) 1px,transparent 1px);
-    background-size:22px 22px,22px 22px;
-    background-position:0 0,11px 11px;
-  }
-  .wrap{position:relative;z-index:1;max-width:var(--maxw);margin:0 auto;padding:0 28px;}
-
-  /* ============ Cover ============ */
-  .cover{
-    position:relative;
-    background:
-      radial-gradient(1200px 500px at 80% -10%,rgba(168,86,44,.28),transparent 60%),
-      linear-gradient(160deg,#12151b 0%,#191d25 55%,#10131a 100%);
-    color:#f2ede5;
-    border-radius:0 0 28px 28px;
-    padding:76px 0 62px;
-    overflow:hidden;
-  }
-  .cover::after{
-    content:"";
-    position:absolute;inset:0;opacity:.30;
-    background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),
-                     linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);
-    background-size:44px 44px;
-    mask-image:radial-gradient(70% 70% at 50% 40%,#000 20%,transparent 100%);
-  }
-  .cover .wrap{position:relative;z-index:2;}
-  .kicker{
-    display:inline-flex;align-items:center;gap:10px;
-    font-size:.74rem;letter-spacing:.22em;text-transform:uppercase;
-    color:var(--copper-2);font-weight:600;
-    border:1px solid rgba(201,122,75,.4);
-    padding:7px 14px;border-radius:999px;
-    background:rgba(201,122,75,.08);
-  }
-  .kicker i{width:6px;height:6px;border-radius:50%;background:var(--copper-2);display:block;}
-  .cover h1{
-    font-family:var(--serif);
-    font-size:clamp(2.1rem,5.2vw,3.5rem);
-    line-height:1.18;
-    margin:26px 0 18px;
-    font-weight:700;
-    letter-spacing:-.01em;
-  }
-  .cover h1 em{
-    font-style:normal;
-    color:var(--copper-2);
-    position:relative;white-space:nowrap;
-  }
-  .cover h1 em::after{
-    content:"";position:absolute;left:0;right:0;bottom:.06em;height:.34em;
-    background:linear-gradient(90deg,rgba(201,122,75,.30),rgba(201,122,75,0));
-    z-index:-1;
-  }
-  .cover .lede{
-    max-width:62ch;color:rgba(242,237,229,.74);font-size:1.06rem;margin:0 0 34px;
-  }
-  .cover-meta{
-    display:flex;flex-wrap:wrap;gap:26px;
-    padding-top:24px;border-top:1px solid rgba(255,255,255,.12);
-  }
-  .cover-meta div{min-width:120px;}
-  .cover-meta .k{font-size:.68rem;letter-spacing:.16em;text-transform:uppercase;color:rgba(242,237,229,.45);}
-  .cover-meta .v{font-family:var(--mono);font-size:.96rem;color:#f2ede5;margin-top:5px;}
-
-  /* ============ Sections ============ */
-  section{padding:66px 0 8px;}
-  .sec-head{display:flex;align-items:baseline;gap:16px;margin-bottom:8px;flex-wrap:wrap;}
-  .sec-num{
-    font-family:var(--serif);font-size:1.5rem;color:var(--copper);
-    font-weight:700;line-height:1;
-  }
-  h2.sec-title{
-    font-family:var(--serif);
-    font-size:clamp(1.4rem,3vw,1.95rem);
-    margin:0;font-weight:700;letter-spacing:-.01em;
-  }
-  .sec-sub{color:var(--muted);font-size:.86rem;margin:0 0 26px;letter-spacing:.02em;}
-  h3{
-    font-family:var(--serif);
-    font-size:1.12rem;margin:34px 0 12px;font-weight:700;
-  }
-  p{margin:0 0 16px;color:var(--ink-2);}
-  strong{color:var(--ink);font-weight:600;}
-  a{color:var(--steel);}
-
-  .rule{
-    height:1px;background:linear-gradient(90deg,var(--line),transparent);
-    margin:0 0 30px;
-  }
-
-  /* ============ Stat cards ============ */
-  .stats{
-    display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:32px 0 10px;
-  }
-  @media(max-width:820px){.stats{grid-template-columns:repeat(2,1fr);}}
-  .stat{
-    background:#fff;border:1px solid var(--line);border-radius:14px;
-    padding:20px 18px;box-shadow:var(--shadow-sm);position:relative;overflow:hidden;
-  }
-  .stat::before{
-    content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
-    background:linear-gradient(180deg,var(--copper),var(--gold));
-  }
-  .stat .n{font-family:var(--serif);font-size:1.9rem;color:var(--ink);line-height:1.1;font-weight:700;}
-  .stat .l{font-size:.78rem;color:var(--muted);margin-top:6px;letter-spacing:.04em;}
-  .stat .u{font-family:var(--mono);font-size:.72rem;color:var(--copper);margin-top:8px;display:block;}
-
-  /* ============ Timeline ============ */
-  .timeline{position:relative;margin:30px 0 10px;padding-left:30px;}
-  .timeline::before{
-    content:"";position:absolute;left:8px;top:6px;bottom:6px;width:1.5px;
-    background:linear-gradient(180deg,var(--copper),var(--line));
-  }
-  .tl-item{position:relative;padding:0 0 26px 6px;}
-  .tl-item::before{
-    content:"";position:absolute;left:-26px;top:7px;width:11px;height:11px;border-radius:50%;
-    background:var(--paper);border:2px solid var(--copper);
-  }
-  .tl-item.done::before{background:var(--copper);}
-  .tl-time{
-    font-family:var(--mono);font-size:.72rem;color:var(--copper);
-    letter-spacing:.06em;margin-bottom:3px;
-  }
-  .tl-title{font-weight:600;font-size:.99rem;margin-bottom:3px;}
-  .tl-desc{color:var(--muted);font-size:.87rem;margin:0;}
-
-  /* ============ Panels / cards ============ */
-  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
-  @media(max-width:820px){.grid-2{grid-template-columns:1fr;}}
-  .card{
-    background:#fff;border:1px solid var(--line);border-radius:14px;
-    padding:22px;box-shadow:var(--shadow-sm);
-  }
-  .card h4{
-    margin:0 0 10px;font-size:.98rem;font-weight:700;
-    display:flex;align-items:center;gap:9px;
-  }
-  .card h4 .dot{width:8px;height:8px;border-radius:50%;background:var(--copper);flex-shrink:0;}
-  .card ul{margin:0;padding-left:18px;color:var(--ink-2);font-size:.9rem;}
-  .card li{margin-bottom:7px;}
-  .card p:last-child{margin-bottom:0;}
-
-  /* ============ Figure ============ */
-  figure{margin:30px 0;}
-  .fig-frame{
-    background:#fff;border:1px solid var(--line);border-radius:16px;
-    padding:14px;box-shadow:var(--shadow);
-  }
-  .fig-frame img{width:100%;display:block;border-radius:10px;}
-  figcaption{
-    margin-top:12px;font-size:.82rem;color:var(--muted);
-    display:flex;gap:10px;align-items:baseline;
-  }
-  .fig-tag{
-    font-family:var(--mono);font-size:.7rem;color:var(--copper);
-    border:1px solid rgba(168,86,44,.35);border-radius:4px;padding:1px 6px;
-    flex-shrink:0;letter-spacing:.05em;
-  }
-
-  /* ============ Diagram frame ============ */
-  .diagram{
-    background:linear-gradient(180deg,#fff,#fbf9f5);
-    border:1px solid var(--line);border-radius:16px;padding:22px;
-    box-shadow:var(--shadow-sm);margin:28px 0;
-  }
-  .diagram svg{width:100%;height:auto;display:block;}
-
-  /* ============ Table ============ */
-  .tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:#fff;box-shadow:var(--shadow-sm);margin:24px 0;}
-  table{width:100%;border-collapse:collapse;font-size:.87rem;}
-  th,td{padding:12px 15px;text-align:left;border-bottom:1px solid var(--line-2);vertical-align:top;}
-  th{
-    background:var(--paper-2);color:var(--ink);font-weight:600;font-size:.76rem;
-    letter-spacing:.06em;text-transform:uppercase;
-  }
-  tr:last-child td{border-bottom:0;}
-  td code{font-family:var(--mono);font-size:.82rem;color:var(--copper);}
-
-  /* ============ Pull quote ============ */
-  .pull{
-    border-left:3px solid var(--copper);
-    padding:6px 0 6px 22px;margin:30px 0;
-    font-family:var(--serif);font-size:1.12rem;color:var(--ink);line-height:1.7;
-  }
-  .pull span{display:block;font-family:var(--sans);font-size:.78rem;color:var(--muted);margin-top:10px;letter-spacing:.04em;}
-
-  /* ============ Bar chart ============ */
-  .bars{margin:26px 0;}
-  .bar-row{display:grid;grid-template-columns:104px 1fr 74px;align-items:center;gap:12px;margin-bottom:12px;}
-  .bar-row .bl{font-size:.83rem;color:var(--ink-2);}
-  .bar-track{height:14px;background:var(--paper-2);border-radius:999px;overflow:hidden;}
-  .bar-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--copper),var(--copper-2));}
-  .bar-fill.s{background:linear-gradient(90deg,var(--steel),#5b87a8);}
-  .bar-fill.g{background:linear-gradient(90deg,var(--gold),#cfae63);}
-  .bar-val{font-family:var(--mono);font-size:.8rem;color:var(--ink);text-align:right;}
-
-  /* ============ Closing ============ */
-  .closing{
-    margin-top:56px;background:linear-gradient(150deg,#161a21,#1e232c);
-    color:#f0ebe3;border-radius:20px;padding:44px 40px;position:relative;overflow:hidden;
-  }
-  .closing::after{
-    content:"";position:absolute;right:-60px;top:-60px;width:260px;height:260px;border-radius:50%;
-    background:radial-gradient(circle,rgba(168,86,44,.35),transparent 70%);
-  }
-  .closing h2{font-family:var(--serif);font-size:1.5rem;margin:0 0 14px;position:relative;z-index:1;}
-  .closing p{color:rgba(240,235,227,.78);position:relative;z-index:1;}
-  .closing .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:26px;position:relative;z-index:1;}
-  @media(max-width:820px){.closing .steps{grid-template-columns:1fr 1fr;}}
-  .closing .step{
-    background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.12);
-    border-radius:12px;padding:14px;
-  }
-  .closing .step b{display:block;font-size:.82rem;color:var(--copper-2);font-family:var(--mono);margin-bottom:5px;}
-  .closing .step span{font-size:.86rem;color:rgba(240,235,227,.8);}
-
-  footer.rep-foot{
-    margin:52px 0 60px;padding-top:22px;border-top:1px solid var(--line);
-    color:var(--muted);font-size:.78rem;display:flex;justify-content:space-between;
-    flex-wrap:wrap;gap:10px;
-  }
-
-  /* reveal */
-  .rv{opacity:0;transform:translateY(14px);transition:opacity .7s ease,transform .7s ease;}
-  .rv.in{opacity:1;transform:none;}
-
-  @media print{
-    body{background:#fff;}
-    body::before{display:none;}
-    .cover{border-radius:0;}
-    section{page-break-inside:avoid;}
-    .rv{opacity:1;transform:none;}
-  }
-</style>
+<link rel="icon" href="favicon.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="tokens.css" />
+<link rel="stylesheet" href="base.css" />
+<link rel="stylesheet" href="components.css" />
+<link rel="stylesheet" href="doc.css" />
+<link rel="stylesheet" href="report.css" />
 </head>
 <body>
 
+<header class="site-header">
+  <div class="site-header__inner">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"></div>
+      <div class="brand-text">
+        <h1>灵巧手控制外设</h1>
+        <p class="sub">视觉采集 · 3D 复现 · 机械手</p>
+      </div>
+    </div>
+    <nav class="site-nav" aria-label="站点导航">
+      <a href="capture.html">采集主端</a>
+      <a href="index.html">硬件设计</a>
+      <a href="mc-hand.html">MC 方案</a>
+      <a href="mc-bridge-guide.html">桥接指南</a>
+      <a href="report.html" aria-current="page">技术报告</a>
+    </nav>
+  </div>
+</header>
+
 <!-- ================= COVER ================= -->
-<header class="cover">
+<header class="doc-hero">
   <div class="wrap">
     <span class="kicker"><i></i>Technical Report · 2026-09-27</span>
     <h1>从灵巧手调研<br/>到<em>硬件实现路径</em></h1>
@@ -290,7 +41,7 @@
       一天内完成从文献检索、视觉采集原型、体感交互验证，到低成本机械手结构方案的完整闭环，
       并明确下一阶段以硬件实现为主线。
     </p>
-    <div class="cover-meta">
+    <div class="doc-hero__meta">
       <div><div class="k">项目</div><div class="v">finger-motion-replay</div></div>
       <div><div class="k">仓库</div><div class="v">github.com/DanielYuJie</div></div>
       <div><div class="k">主线</div><div class="v">Hardware-first</div></div>
@@ -302,7 +53,7 @@
 <div class="wrap">
 
 <!-- ================= 摘要 ================= -->
-<section class="rv">
+<section class="rv doc-section">
   <div class="sec-head">
     <span class="sec-num">01</span>
     <h2 class="sec-title">摘要</h2>
@@ -324,8 +75,8 @@
   <div class="stats">
     <div class="stat">
       <div class="n">5</div>
-      <div class="l">可运行网页原型</div>
-      <span class="u">采集 · 复现 · 游戏 · 装机 · 图纸</span>
+      <div class="l">站点页面</div>
+      <span class="u">采集 · 图纸 · MC · 桥接 · 报告</span>
     </div>
     <div class="stat">
       <div class="n">21</div>
@@ -346,7 +97,7 @@
 </section>
 
 <!-- ================= 时间线 ================= -->
-<section class="rv">
+<section class="rv doc-section">
   <div class="sec-head">
     <span class="sec-num">02</span>
     <h2 class="sec-title">当日工作脉络</h2>
@@ -389,7 +140,7 @@
 </section>
 
 <!-- ================= 软件 ================= -->
-<section class="rv">
+<section class="rv doc-section">
   <div class="sec-head">
     <span class="sec-num">03</span>
     <h2 class="sec-title">软件原型：从像素到关节角</h2>
@@ -491,17 +242,21 @@
 </section>
 
 <!-- ================= 游戏 ================= -->
-<section class="rv">
+<section class="rv doc-section">
   <div class="sec-head">
     <span class="sec-num">04</span>
-    <h2 class="sec-title">交互验证：体感搭积木</h2>
+    <h2 class="sec-title">交互验证：手势游戏实验台</h2>
   </div>
   <p class="sec-sub">INTERACTION TESTBED</p>
   <div class="rule"></div>
 
   <p>
-    为验证「手势 → 执行」闭环的可用性，做了一款搭积木小游戏：手掌移动牵引方块，
-    拇指与食指捏合放置。它同时充当了硬件遥操作的手感预演。
+    为验证「手势 → 执行」闭环的可用性，当天做了一款搭积木小游戏作为交互实验台：手掌移动牵引方块，
+    拇指与食指捏合放置，握拳急刹。它验证了手势驱动执行器的可行性，也充当了硬件遥操作的手感预演。
+  </p>
+  <p>
+    该实验台随后从交付链路中收敛掉 —— 最终只保留视觉主端、硬件图纸与 MC 桥接三部分，
+    以免分散主线；本节保留其结论，作为「手势输入足以驱动执行」的证据。
   </p>
 
   <div class="diagram">
@@ -555,7 +310,7 @@
 </section>
 
 <!-- ================= 硬件 ================= -->
-<section class="rv">
+<section class="rv doc-section">
   <div class="sec-head">
     <span class="sec-num">05</span>
     <h2 class="sec-title">硬件方案：可制造的机械手</h2>
@@ -579,7 +334,7 @@
   </figure>
 
   <h3>两种实现路线</h3>
-  <div class="tbl-wrap">
+  <div class="table-wrap">
     <table>
       <thead>
         <tr><th>维度</th><th>3D 打印版</th><th>冰糕棒版</th></tr>
@@ -623,9 +378,9 @@
       <span class="bar-val">¥11</span>
     </div>
   </div>
-  <p style="font-size:.8rem;color:#7d848f;font-family:var(--mono)">图 4 · 3D 打印版单套成本分解（示意，单位：元）</p>
+  <p class="bars-note">图 4 · 3D 打印版单套成本分解（示意，单位：元）</p>
 
-  <div class="grid-2" style="margin-top:26px">
+  <div class="grid-2 mt-5">
     <div class="card">
       <h4><span class="dot"></span>关键设计决策</h4>
       <ul>
@@ -648,7 +403,7 @@
 </section>
 
 <!-- ================= 开源对标 ================= -->
-<section class="rv">
+<section class="rv doc-section">
   <div class="sec-head">
     <span class="sec-num">06</span>
     <h2 class="sec-title">开源对标与最小可抄集</h2>
@@ -661,7 +416,7 @@
     据此收敛出一份最小可抄清单，避免从零造轮子。
   </p>
 
-  <div class="tbl-wrap">
+  <div class="table-wrap">
     <table>
       <thead>
         <tr><th>项目</th><th>可抄内容</th><th>用途</th><th>星标</th></tr>
@@ -701,7 +456,7 @@
     </table>
   </div>
 
-  <div class="card" style="margin-top:22px">
+  <div class="card mt-5">
     <h4><span class="dot"></span>最小下载集（20 分钟内可完成）</h4>
     <ul>
       <li><strong>结构</strong>：FreeHand <code>handfiles/</code> 的 STL 与工程图 PDF — 冰糕棒方案只需拇指座 STL</li>
@@ -714,7 +469,7 @@
 </section>
 
 <!-- ================= 结论 ================= -->
-<section class="rv">
+<section class="rv doc-section">
   <div class="sec-head">
     <span class="sec-num">07</span>
     <h2 class="sec-title">结论与下一步</h2>
@@ -738,7 +493,7 @@
     </div>
   </div>
 
-  <footer class="rep-foot">
+  <footer class="site-footer">
     <span>技术报告 · 灵巧手控制外设项目 · 2026-09-27</span>
     <span>仓库：github.com/DanielYuJie/finger-motion-replay</span>
   </footer>
@@ -749,6 +504,7 @@
 <script>
   // scroll reveal
   (function () {
+    document.documentElement.classList.add("js");
     var els = document.querySelectorAll(".rv");
     if (!("IntersectionObserver" in window)) {
       els.forEach(function (e) { e.classList.add("in"); });

@@ -1,0 +1,141 @@
+/* ==========================================================================
+   tokens.css — the single source of truth for the whole product.
+   Nothing else in the project may declare a raw colour, radius, shadow or
+   font stack. Two themes, one vocabulary:
+     :root                  → "app"   dark technical surface (the live tool)
+     [data-theme="paper"]   → "paper" light editorial surface (documents)
+   Two accents are intentional and semantic:
+     --brand   copper  · the product's identity, used for marks and headings
+     --accent  blue    · functional/interactive state, used for controls
+   ========================================================================== */
+
+:root {
+  /* ---------- scale: spacing (4px base) ---------- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+  --sp-8: 64px;
+
+  /* ---------- scale: radius ---------- */
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --r-pill: 999px;
+
+  /* ---------- scale: type ---------- */
+  --fs-xs: 0.75rem;    /* 12px — hard floor, never go below for CJK */
+  --fs-sm: 0.8125rem;  /* 13px */
+  --fs-md: 0.875rem;   /* 14px */
+  --fs-base: 1rem;     /* 16px */
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.375rem;
+  --fs-2xl: 1.75rem;
+  --fs-3xl: clamp(1.75rem, 3.4vw, 2.4rem);
+  --fs-display: clamp(2.1rem, 5.2vw, 3.5rem);
+
+  --lh-tight: 1.25;
+  --lh-snug: 1.5;
+  --lh-base: 1.7;
+
+  /* ---------- fonts ---------- */
+  --font-sans: "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei",
+    -apple-system, "Segoe UI", system-ui, sans-serif;
+  --font-serif: "Songti SC", "Source Han Serif SC", "Noto Serif SC", Georgia,
+    "Times New Roman", serif;
+  --font-mono: "Cascadia Code", "SF Mono", Consolas, ui-monospace, monospace;
+
+  /* ---------- motion ---------- */
+  --dur: 160ms;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ---------- layout ---------- */
+  --maxw-app: 1280px;
+  --maxw-doc: 1080px;
+  --header-h: 64px;
+
+  /* ---------- APPTHEME (dark) — shared semantic names ---------- */
+  --bg: #0b0f14;
+  --bg-glow: rgba(61, 156, 240, 0.07);
+  --surface: #111721;
+  --surface-2: #161e2a;
+  --surface-3: #1c2634;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.16);
+
+  --text: #e8eef6;
+  --text-2: #a9b8c9;
+  --text-3: #7d8fa3;      /* ≥4.5:1 on --bg, carries instructional copy */
+
+  --brand: #c97a4b;
+  --brand-soft: rgba(201, 122, 75, 0.12);
+  --accent: #3d9cf0;
+  --accent-2: #63b4ff;
+  --accent-soft: rgba(61, 156, 240, 0.12);
+  --accent-line: rgba(61, 156, 240, 0.35);
+
+  --ok: #3ecf8e;
+  --warn: #f0b429;
+  --danger: #f2604f;
+  --data: #5ad1ff;        /* numeric readouts */
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.22);
+  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-3: 0 18px 50px rgba(0, 0, 0, 0.45);
+
+  --focus: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+  --canvas-bg: #080c11;
+  --grain: none;
+
+  /* ink band — the hero treatment shared by every document page */
+  --hero-bg: #12151b;
+  --hero-bg-2: #191d25;
+  --hero-text: #f2ede5;
+  --hero-muted: rgba(242, 237, 229, 0.72);
+  --hero-line: rgba(255, 255, 255, 0.12);
+}
+
+/* ==========================================================================
+   PAPER THEME — light editorial surface for the four document pages.
+   Derived from the project's technical-report look (warm paper, copper, serif).
+   ========================================================================== */
+[data-theme="paper"] {
+  --bg: #f7f4ef;
+  --bg-glow: rgba(168, 86, 44, 0.05);
+  --surface: #ffffff;
+  --surface-2: #efeae1;
+  --surface-3: #e8e2d8;
+  --line: #ded7cb;
+  --line-strong: #cec5b5;
+
+  --text: #16191f;
+  --text-2: #3a4049;
+  --text-3: #6f7681;      /* ≥4.5:1 on --bg */
+
+  --brand: #a8562c;
+  --brand-soft: rgba(168, 86, 44, 0.08);
+  --accent: #3a5f7d;      /* steel blue — functional/interactive on paper */
+  --accent-2: #4a7699;
+  --accent-soft: rgba(58, 95, 125, 0.09);
+  --accent-line: rgba(58, 95, 125, 0.3);
+
+  --ok: #4a7d5f;
+  --warn: #a8791f;
+  --danger: #b3382c;
+  --data: #a8562c;
+
+  --shadow-1: 0 1px 2px rgba(22, 25, 31, 0.04), 0 2px 8px rgba(22, 25, 31, 0.05);
+  --shadow-2: 0 6px 20px rgba(22, 25, 31, 0.07);
+  --shadow-3: 0 18px 50px rgba(22, 25, 31, 0.1);
+
+  --focus: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+  --canvas-bg: #f2eee7;
+  --grain:
+    radial-gradient(rgba(22, 25, 31, 0.035) 1px, transparent 1px),
+    radial-gradient(rgba(22, 25, 31, 0.02) 1px, transparent 1px);
+}

@@ -1,0 +1,28 @@
+/* ==========================================================================
+   mc-hand.css — page-specific layout for the Minecraft Create mechanism page.
+   The ink hero, section rhythm, figures, diagrams, tables, cards, callouts and
+   footer all come from doc.css / components.css; this file only carries what is
+   unique to this page, and every value is a token.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Callouts: the page's closing note needs air above it
+   -------------------------------------------------------------------------- */
+.callout.tail { margin: var(--sp-7) 0 0; }
+
+/* --------------------------------------------------------------------------
+   Cards: the two-up comparison blocks start with an h3, so it must not push
+   away from the card edge (replaces the inline style the old page carried)
+   -------------------------------------------------------------------------- */
+.card > h3:first-child { margin-top: 0; }
+
+/* --------------------------------------------------------------------------
+   Diagrams: inline SVG schematics. The frame comes from doc.css; the SVG is
+   drawn at full width. Labels inside the SVG stay monospaced.
+   -------------------------------------------------------------------------- */
+.diagram svg text[font-family="monospace"] { font-family: var(--font-mono); }
+
+@media print {
+  .diagram,
+  .fig-frame { break-inside: avoid; }
+}

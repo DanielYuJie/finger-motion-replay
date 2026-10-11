@@ -1,0 +1,246 @@
+/* ==========================================================================
+   doc.css — shared layout for the document pages (paper theme).
+   Used by report.html, index.html, mc-hand.html, mc-bridge-guide.html.
+   Depends on tokens.css + base.css + components.css.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Ink hero — the same band on every document, so the four pages read as a set
+   -------------------------------------------------------------------------- */
+.doc-hero {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(1100px 460px at 82% -12%, color-mix(in srgb, var(--brand) 42%, transparent), transparent 62%),
+    linear-gradient(160deg, var(--hero-bg) 0%, var(--hero-bg-2) 55%, var(--hero-bg) 100%);
+  color: var(--hero-text);
+  border-radius: 0 0 var(--r-xl) var(--r-xl);
+  padding: var(--sp-8) 0 var(--sp-7);
+  margin-bottom: var(--sp-6);
+}
+.doc-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.3;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(70% 70% at 50% 40%, #000 20%, transparent 100%);
+  -webkit-mask-image: radial-gradient(70% 70% at 50% 40%, #000 20%, transparent 100%);
+}
+.doc-hero > .wrap { position: relative; z-index: 2; }
+
+.doc-hero h1 {
+  font-family: var(--font-serif);
+  font-size: var(--fs-display);
+  line-height: 1.18;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: var(--sp-5) 0 var(--sp-4);
+  color: var(--hero-text);
+}
+.doc-hero h1 em {
+  font-style: normal;
+  color: color-mix(in srgb, var(--brand) 60%, #fff);
+  position: relative;
+  white-space: nowrap;
+}
+.doc-hero h1 em::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0.06em;
+  height: 0.34em;
+  z-index: -1;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--brand) 34%, transparent), transparent);
+}
+.doc-hero .lede {
+  max-width: 62ch;
+  margin: 0 0 var(--sp-6);
+  font-size: var(--fs-lg);
+  color: var(--hero-muted);
+}
+.doc-hero__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-5);
+  padding-top: var(--sp-5);
+  border-top: 1px solid var(--hero-line);
+}
+.doc-hero__meta > div { min-width: 120px; }
+.doc-hero__meta .k {
+  font-size: var(--fs-xs);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--hero-text) 50%, transparent);
+}
+.doc-hero__meta .v {
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-md);
+  color: var(--hero-text);
+}
+
+/* kicker inside the dark band needs a lighter treatment than the paper one */
+.doc-hero .kicker {
+  color: color-mix(in srgb, var(--brand) 55%, #fff);
+  border-color: color-mix(in srgb, var(--brand) 55%, transparent);
+  background: color-mix(in srgb, var(--brand) 14%, transparent);
+}
+.doc-hero .kicker i { background: color-mix(in srgb, var(--brand) 55%, #fff); }
+
+/* Inside the dark band, `strong`/links must not inherit the paper ink colour —
+   base.css sets strong to var(--text), which is near-black on the paper theme. */
+.doc-hero strong,
+.doc-hero b,
+.doc-hero .lede strong {
+  color: var(--hero-text);
+  font-weight: 600;
+}
+.doc-hero a {
+  color: color-mix(in srgb, var(--brand) 58%, #fff);
+}
+.doc-hero a:hover {
+  color: color-mix(in srgb, var(--brand) 40%, #fff);
+}
+.doc-hero code {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--hero-text);
+}
+
+/* same hazard inside the dark closing panel on the report */
+.closing strong,
+.closing b { color: var(--hero-text); }
+.closing a { color: color-mix(in srgb, var(--brand) 58%, #fff); }
+
+/* --------------------------------------------------------------------------
+   Document body rhythm
+   -------------------------------------------------------------------------- */
+.doc-section { padding: var(--sp-7) 0 0; }
+.doc-section:first-of-type { padding-top: var(--sp-6); }
+
+.doc p { font-size: var(--fs-base); }
+.doc h3,
+.doc-section h3 {
+  font-family: var(--font-serif);
+  font-size: var(--fs-lg);
+  margin: var(--sp-6) 0 var(--sp-3);
+}
+
+/* --------------------------------------------------------------------------
+   Figure
+   -------------------------------------------------------------------------- */
+figure { margin: var(--sp-6) 0; }
+.fig-frame {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: var(--sp-3);
+  box-shadow: var(--shadow-2);
+}
+.fig-frame img { display: block; width: 100%; border-radius: var(--r-sm); }
+figcaption {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  margin-top: var(--sp-3);
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+}
+.fig-tag {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.05em;
+  color: var(--brand);
+  border: 1px solid color-mix(in srgb, var(--brand) 35%, transparent);
+  border-radius: var(--r-xs);
+  padding: 1px 6px;
+}
+
+/* --------------------------------------------------------------------------
+   Diagram frame (inline SVG / ASCII figures)
+   -------------------------------------------------------------------------- */
+.diagram {
+  margin: var(--sp-5) 0;
+  padding: var(--sp-5);
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+  overflow-x: auto;
+}
+.diagram svg { display: block; width: 100%; height: auto; }
+.diagram pre {
+  margin: 0;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--text-2);
+}
+
+/* --------------------------------------------------------------------------
+   Pull quote
+   -------------------------------------------------------------------------- */
+.pull {
+  margin: var(--sp-6) 0;
+  padding: var(--sp-2) 0 var(--sp-2) var(--sp-5);
+  border-left: 3px solid var(--brand);
+  font-family: var(--font-serif);
+  font-size: var(--fs-lg);
+  line-height: var(--lh-base);
+  color: var(--text);
+}
+.pull span {
+  display: block;
+  margin-top: var(--sp-3);
+  font-family: var(--font-sans);
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+  letter-spacing: 0.04em;
+}
+
+/* --------------------------------------------------------------------------
+   Table of contents
+   -------------------------------------------------------------------------- */
+.toc {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: var(--sp-5);
+  box-shadow: var(--shadow-1);
+}
+.toc h2 {
+  font-size: var(--fs-sm);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: var(--sp-3);
+}
+.toc ol { margin: 0; padding-left: 1.3em; }
+.toc li { margin-bottom: var(--sp-2); font-size: var(--fs-md); }
+.toc a { color: var(--text-2); }
+.toc a:hover { color: var(--accent); }
+
+/* --------------------------------------------------------------------------
+   Scroll reveal — gated behind .js so content is never hidden without JS,
+   and neutralised entirely when the user prefers reduced motion.
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+  .js .rv {
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity 0.6s var(--ease), transform 0.6s var(--ease);
+  }
+  .js .rv.in { opacity: 1; transform: none; }
+}
+
+@media print {
+  .doc-hero { border-radius: 0; }
+  .doc-section { page-break-inside: avoid; }
+  .rv { opacity: 1 !important; transform: none !important; }
+}

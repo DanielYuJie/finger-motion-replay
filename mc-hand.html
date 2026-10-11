@@ -1,117 +1,47 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
+﻿<!DOCTYPE html>
+<html lang="zh-CN" data-theme="paper">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>MC 机械手搭建方案 · Create 机构版</title>
-<style>
-  :root{
-    --bg:#eef1ee;
-    --paper:#ffffff;
-    --ink:#1b2118;
-    --ink2:#3b443a;
-    --muted:#74806f;
-    --line:#d6ddd3;
-    --grass:#5c8a3c;
-    --brass:#b8892f;
-    --copper:#a8562c;
-    --red:#b3382c;
-    --blue:#3a5f7d;
-    --mono:"Cascadia Code","Consolas",ui-monospace,monospace;
-    --sans:"PingFang SC","Microsoft YaHei",-apple-system,"Segoe UI",sans-serif;
-  }
-  *{box-sizing:border-box;}
-  body{
-    margin:0;background:var(--bg);color:var(--ink);
-    font-family:var(--sans);line-height:1.75;font-size:16px;
-  }
-  .wrap{max-width:1020px;margin:0 auto;padding:0 24px 70px;}
-
-  header.top{
-    background:linear-gradient(150deg,#1e2a1c 0%,#2b3a26 50%,#1a2419 100%);
-    color:#eef3ea;padding:60px 0 50px;margin-bottom:0;
-    position:relative;overflow:hidden;
-  }
-  header.top::after{
-    content:"";position:absolute;inset:0;opacity:.22;
-    background-image:linear-gradient(rgba(255,255,255,.07) 1px,transparent 1px),
-                     linear-gradient(90deg,rgba(255,255,255,.07) 1px,transparent 1px);
-    background-size:32px 32px;
-  }
-  .wrap-h{max-width:1020px;margin:0 auto;padding:0 24px;position:relative;z-index:2;}
-  .tag{
-    display:inline-block;font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;
-    color:#c9a961;border:1px solid rgba(201,169,97,.4);border-radius:999px;
-    padding:6px 14px;background:rgba(201,169,97,.08);font-weight:600;
-  }
-  header.top h1{
-    font-size:clamp(1.9rem,4.6vw,3rem);margin:22px 0 14px;line-height:1.2;
-    font-weight:800;letter-spacing:-.01em;
-  }
-  header.top h1 span{color:#c9a961;}
-  header.top p{color:rgba(238,243,234,.72);max-width:64ch;margin:0;}
-  .hmeta{display:flex;flex-wrap:wrap;gap:28px;margin-top:30px;padding-top:22px;border-top:1px solid rgba(255,255,255,.12);}
-  .hmeta div .k{font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:rgba(238,243,234,.45);}
-  .hmeta div .v{font-family:var(--mono);font-size:.92rem;margin-top:4px;}
-
-  section{padding:52px 0 0;}
-  .shead{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;}
-  .snum{font-family:var(--mono);font-size:1.05rem;color:var(--brass);font-weight:700;}
-  h2{margin:0;font-size:clamp(1.3rem,2.8vw,1.7rem);font-weight:800;letter-spacing:-.01em;}
-  .ssub{color:var(--muted);font-size:.84rem;margin:0 0 22px;}
-  h3{font-size:1.05rem;margin:30px 0 12px;font-weight:700;}
-  p{margin:0 0 15px;color:var(--ink2);}
-
-  .card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:22px;box-shadow:0 6px 22px rgba(27,33,24,.06);}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
-  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
-  @media(max-width:820px){.grid2,.grid3{grid-template-columns:1fr;}}
-
-  .diagram{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:20px;margin:24px 0;box-shadow:0 6px 22px rgba(27,33,24,.06);}
-  .diagram svg{width:100%;height:auto;display:block;}
-  .cap{font-size:.8rem;color:var(--muted);font-family:var(--mono);margin-top:12px;}
-
-  table{width:100%;border-collapse:collapse;font-size:.88rem;background:var(--paper);border-radius:12px;overflow:hidden;box-shadow:0 6px 22px rgba(27,33,24,.06);}
-  th,td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top;}
-  th{background:#e7ebe4;font-size:.76rem;letter-spacing:.05em;text-transform:uppercase;font-weight:700;}
-  tr:last-child td{border-bottom:0;}
-  code{font-family:var(--mono);font-size:.83rem;color:var(--copper);}
-
-  ul{margin:0 0 6px;padding-left:20px;color:var(--ink2);font-size:.92rem;}
-  li{margin-bottom:6px;}
-
-  .callout{
-    border-left:3px solid var(--brass);background:rgba(184,137,47,.08);
-    border-radius:0 10px 10px 0;padding:14px 18px;margin:22px 0;font-size:.92rem;color:var(--ink2);
-  }
-  .callout.warn{border-color:var(--red);background:rgba(179,56,44,.07);}
-  .callout.ok{border-color:var(--grass);background:rgba(92,138,60,.09);}
-
-  .steps{counter-reset:s;display:flex;flex-direction:column;gap:12px;margin-top:8px;}
-  .step{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:16px 18px 16px 56px;position:relative;}
-  .step::before{
-    counter-increment:s;content:counter(s);
-    position:absolute;left:16px;top:16px;width:26px;height:26px;border-radius:50%;
-    background:var(--grass);color:#fff;display:flex;align-items:center;justify-content:center;
-    font-size:.82rem;font-weight:700;font-family:var(--mono);
-  }
-  .step b{display:block;font-size:.95rem;margin-bottom:4px;}
-  .step span{font-size:.87rem;color:var(--muted);}
-
-  footer.f{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:.78rem;}
-</style>
+<link rel="icon" href="favicon.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="tokens.css" />
+<link rel="stylesheet" href="base.css" />
+<link rel="stylesheet" href="components.css" />
+<link rel="stylesheet" href="doc.css" />
+<link rel="stylesheet" href="mc-hand.css" />
 </head>
 <body>
 
-<header class="top">
-  <div class="wrap-h">
-    <span class="tag">Minecraft · Create Mod · Mechanism Design</span>
-    <h1>用 MC 搭一只<span>机械硬件手</span><br/>控制逻辑预演方案</h1>
-    <p>
+<header class="site-header">
+  <div class="site-header__inner">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"></div>
+      <div class="brand-text">
+        <h1>灵巧手控制外设</h1>
+        <p class="sub">视觉采集 · 3D 复现 · 机械手</p>
+      </div>
+    </div>
+    <nav class="site-nav" aria-label="站点导航">
+      <a href="capture.html">采集主端</a>
+      <a href="index.html">硬件设计</a>
+      <a href="mc-hand.html" aria-current="page">MC 方案</a>
+      <a href="mc-bridge-guide.html">桥接指南</a>
+      <a href="report.html">技术报告</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ================= HERO ================= -->
+<header class="doc-hero">
+  <div class="wrap">
+    <span class="kicker"><i></i>Minecraft · Create Mod · Mechanism Design</span>
+    <h1>用 MC 搭一只<em>机械硬件手</em><br/>控制逻辑预演方案</h1>
+    <p class="lede">
       以 Create 模组的轴承与绳索滑轮模拟关节与腱绳，用齿轮变速与序列换挡控制弯曲角度，
       在方块世界里先跑通「指令 → 动作」的完整流程，再映射到真实舵机与腱绳手。
     </p>
-    <div class="hmeta">
+    <div class="doc-hero__meta">
       <div><div class="k">定位</div><div class="v">动作逻辑验证</div></div>
       <div><div class="k">核心机构</div><div class="v">机械轴承 + 绳索滑轮</div></div>
       <div><div class="k">自由度</div><div class="v">5 DoF（简化）/ 15 DoF（完整）</div></div>
@@ -122,14 +52,18 @@
 
 <div class="wrap">
 
-<!-- 1 -->
-<section>
-  <div class="shead"><span class="snum">01</span><h2>能验证什么，不能验证什么</h2></div>
-  <p class="ssub">SCOPE</p>
+<!-- ================= 01 范围 ================= -->
+<section class="doc-section">
+  <div class="sec-head">
+    <span class="sec-num">01</span>
+    <h2 class="sec-title">能验证什么，不能验证什么</h2>
+  </div>
+  <p class="sec-sub">SCOPE</p>
+  <div class="rule"></div>
 
-  <div class="grid2">
+  <div class="grid-2">
     <div class="card">
-      <h3 style="margin-top:0">✅ 适合验证</h3>
+      <h3>✅ 适合验证</h3>
       <ul>
         <li>五指的<b>动作时序</b>：哪根先动、间隔多久</li>
         <li><b>控制链路</b>：主端指令 → 各指独立响应</li>
@@ -139,7 +73,7 @@
       </ul>
     </div>
     <div class="card">
-      <h3 style="margin-top:0">❌ 不适合验证</h3>
+      <h3>❌ 不适合验证</h3>
       <ul>
         <li>连续角度与真实关节角（方块旋转是离散步进）</li>
         <li>腱绳张力、抓持力、摩擦与疲劳</li>
@@ -155,10 +89,14 @@
   </div>
 </section>
 
-<!-- 2 -->
-<section>
-  <div class="shead"><span class="snum">02</span><h2>整手布局（俯视）</h2></div>
-  <p class="ssub">TOP VIEW · 1 格 = 1 米</p>
+<!-- ================= 02 整手布局 ================= -->
+<section class="doc-section">
+  <div class="sec-head">
+    <span class="sec-num">02</span>
+    <h2 class="sec-title">整手布局（俯视）</h2>
+  </div>
+  <p class="sec-sub">TOP VIEW · 1 格 = 1 米</p>
+  <div class="rule"></div>
 
   <div class="diagram">
     <svg viewBox="0 0 1000 470" xmlns="http://www.w3.org/2000/svg" font-family="PingFang SC, Microsoft YaHei, sans-serif">
@@ -241,10 +179,14 @@
   </div>
 </section>
 
-<!-- 3 -->
-<section>
-  <div class="shead"><span class="snum">03</span><h2>单指机构（侧剖）</h2></div>
-  <p class="ssub">FINGER MECHANISM · 对应真实腱绳手</p>
+<!-- ================= 03 单指机构 ================= -->
+<section class="doc-section">
+  <div class="sec-head">
+    <span class="sec-num">03</span>
+    <h2 class="sec-title">单指机构（侧剖）</h2>
+  </div>
+  <p class="sec-sub">FINGER MECHANISM · 对应真实腱绳手</p>
+  <div class="rule"></div>
 
   <div class="diagram">
     <svg viewBox="0 0 1000 420" xmlns="http://www.w3.org/2000/svg" font-family="PingFang SC, Microsoft YaHei, sans-serif">
@@ -315,34 +257,47 @@
     </svg>
   </div>
 
+  <figure>
+    <div class="fig-frame">
+      <img src="mc-hand-render.png" alt="Create 机械手结构效果图" loading="lazy">
+    </div>
+    <figcaption><span class="fig-tag">FIG</span>Create 机械手结构效果图 · 等距体素渲染</figcaption>
+  </figure>
+
   <h3>两个实现档位</h3>
-  <table>
-    <thead>
-      <tr><th>档位</th><th>每指机构</th><th>自由度</th><th>用料量级</th><th>建议</th></tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><b>简化版</b></td>
-        <td>1 个机械轴承（指根）+ 1 个绳索滑轮</td>
-        <td>5 DoF</td>
-        <td>轴承 ×5、滑轮 ×5</td>
-        <td><b>先做这个</b>：一天可搭完，逻辑完整</td>
-      </tr>
-      <tr>
-        <td><b>完整版</b></td>
-        <td>每节 1 轴承（近/中/远），三层嵌套</td>
-        <td>15 DoF</td>
-        <td>轴承 ×15、换挡 ×15</td>
-        <td>轴承嵌套易卡，仅追求视觉震撼时做</td>
-      </tr>
-    </tbody>
-  </table>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>档位</th><th>每指机构</th><th>自由度</th><th>用料量级</th><th>建议</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>简化版</b></td>
+          <td>1 个机械轴承（指根）+ 1 个绳索滑轮</td>
+          <td>5 DoF</td>
+          <td>轴承 ×5、滑轮 ×5</td>
+          <td><b>先做这个</b>：一天可搭完，逻辑完整</td>
+        </tr>
+        <tr>
+          <td><b>完整版</b></td>
+          <td>每节 1 轴承（近/中/远），三层嵌套</td>
+          <td>15 DoF</td>
+          <td>轴承 ×15、换挡 ×15</td>
+          <td>轴承嵌套易卡，仅追求视觉震撼时做</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 </section>
 
-<!-- 4 -->
-<section>
-  <div class="shead"><span class="snum">04</span><h2>控制与信号分配</h2></div>
-  <p class="ssub">CONTROL ARCHITECTURE</p>
+<!-- ================= 04 控制与信号 ================= -->
+<section class="doc-section">
+  <div class="sec-head">
+    <span class="sec-num">04</span>
+    <h2 class="sec-title">控制与信号分配</h2>
+  </div>
+  <p class="sec-sub">CONTROL ARCHITECTURE</p>
+  <div class="rule"></div>
 
   <div class="diagram">
     <svg viewBox="0 0 1000 360" xmlns="http://www.w3.org/2000/svg" font-family="PingFang SC, Microsoft YaHei, sans-serif">
@@ -405,9 +360,9 @@
     </svg>
   </div>
 
-  <div class="grid2">
+  <div class="grid-2">
     <div class="card">
-      <h3 style="margin-top:0">纯红石替代（无 Create）</h3>
+      <h3>纯红石替代（无 Create）</h3>
       <ul>
         <li>粘液块 + 活塞：两态夹爪（开 / 合）</li>
         <li>观察者 + T 触发器：单脉冲步进</li>
@@ -416,7 +371,7 @@
       </ul>
     </div>
     <div class="card">
-      <h3 style="margin-top:0">ComputerCraft 进阶（可选）</h3>
+      <h3>ComputerCraft 进阶（可选）</h3>
       <ul>
         <li>CC 电脑 + 红石 I/O 输出 5 路信号</li>
         <li>Lua 脚本定义姿态：握拳 / 捏取 / 指向</li>
@@ -432,60 +387,70 @@
   </div>
 </section>
 
-<!-- 5 -->
-<section>
-  <div class="shead"><span class="snum">05</span><h2>动作时序表</h2></div>
-  <p class="ssub">POSE SEQUENCE</p>
+<!-- ================= 05 动作时序 ================= -->
+<section class="doc-section">
+  <div class="sec-head">
+    <span class="sec-num">05</span>
+    <h2 class="sec-title">动作时序表</h2>
+  </div>
+  <p class="sec-sub">POSE SEQUENCE</p>
+  <div class="rule"></div>
 
-  <table>
-    <thead>
-      <tr><th>姿态</th><th>动作顺序</th><th>延时</th><th>对应实物</th></tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><b>张开</b></td>
-        <td>全部换挡反向脉冲 ×1，回位</td>
-        <td>0 tick</td>
-        <td>弹簧回位至初始角</td>
-      </tr>
-      <tr>
-        <td><b>握拳</b></td>
-        <td>中指 → 无名指 → 食指 → 小指 → 拇指</td>
-        <td>每指间隔 4 tick</td>
-        <td>依次收拢，防打架</td>
-      </tr>
-      <tr>
-        <td><b>捏取</b></td>
-        <td>拇指 + 食指同时脉冲 ×2，其余不动</td>
-        <td>同步</td>
-        <td>两指对捏轻物</td>
-      </tr>
-      <tr>
-        <td><b>指向</b></td>
-        <td>仅食指伸直，其余收拢</td>
-        <td>先收后指，间隔 6 tick</td>
-        <td>指示动作</td>
-      </tr>
-      <tr>
-        <td><b>对掌</b></td>
-        <td>小指 + 拇指相向，形成环</td>
-        <td>同步</td>
-        <td>拇指对掌测试</td>
-      </tr>
-      <tr>
-        <td><b>急停</b></td>
-        <td>主离合断开</td>
-        <td>立即</td>
-        <td>断电保位</td>
-      </tr>
-    </tbody>
-  </table>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>姿态</th><th>动作顺序</th><th>延时</th><th>对应实物</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>张开</b></td>
+          <td>全部换挡反向脉冲 ×1，回位</td>
+          <td>0 tick</td>
+          <td>弹簧回位至初始角</td>
+        </tr>
+        <tr>
+          <td><b>握拳</b></td>
+          <td>中指 → 无名指 → 食指 → 小指 → 拇指</td>
+          <td>每指间隔 4 tick</td>
+          <td>依次收拢，防打架</td>
+        </tr>
+        <tr>
+          <td><b>捏取</b></td>
+          <td>拇指 + 食指同时脉冲 ×2，其余不动</td>
+          <td>同步</td>
+          <td>两指对捏轻物</td>
+        </tr>
+        <tr>
+          <td><b>指向</b></td>
+          <td>仅食指伸直，其余收拢</td>
+          <td>先收后指，间隔 6 tick</td>
+          <td>指示动作</td>
+        </tr>
+        <tr>
+          <td><b>对掌</b></td>
+          <td>小指 + 拇指相向，形成环</td>
+          <td>同步</td>
+          <td>拇指对掌测试</td>
+        </tr>
+        <tr>
+          <td><b>急停</b></td>
+          <td>主离合断开</td>
+          <td>立即</td>
+          <td>断电保位</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 </section>
 
-<!-- 6 -->
-<section>
-  <div class="shead"><span class="snum">06</span><h2>搭建步骤</h2></div>
-  <p class="ssub">BUILD ORDER</p>
+<!-- ================= 06 搭建步骤 ================= -->
+<section class="doc-section">
+  <div class="sec-head">
+    <span class="sec-num">06</span>
+    <h2 class="sec-title">搭建步骤</h2>
+  </div>
+  <p class="sec-sub">BUILD ORDER</p>
+  <div class="rule"></div>
 
   <div class="steps">
     <div class="step"><b>定基础与动力舱</b><span>先铺掌部平台 8×3，下方放转速控制器、离合器与动力源；用创造马达最快，正式版换风车/蒸汽机。</span></div>
@@ -497,16 +462,17 @@
     <div class="step"><b>跑姿态序列</b><span>按第 5 节表格调延时，依次验证握拳、捏取、指向、对掌。</span></div>
     <div class="step"><b>记录与映射</b><span>把每个姿态的脉冲数、延时记下来，作为实物舵机角度与动作间隔的初值。</span></div>
   </div>
+
+  <div class="callout tail">
+    <b>尺度提醒：</b>1 方块 = 1 米，所以这只手会是「巨型机械手」。若想接近真人尺寸观感，
+    可用<b>小方块模组（Chisels &amp; Bits / LittleTiles）</b>把比例缩到 1/4，或接受它作为「演示装置」的定位。
+  </div>
+
+  <footer class="site-footer">
+    <span>MC 机械手搭建方案 · Create 机构版 · 控制逻辑预演 · 可迁移至 ESP32 + 舵机实物实现</span>
+    <span><a href="capture.html">采集主端</a> · <a href="index.html">硬件设计</a> · <a href="mc-bridge-guide.html">桥接指南</a></span>
+  </footer>
 </section>
-
-<div class="callout" style="margin-top:36px">
-  <b>尺度提醒：</b>1 方块 = 1 米，所以这只手会是「巨型机械手」。若想接近真人尺寸观感，
-  可用<b>小方块模组（Chisels &amp; Bits / LittleTiles）</b>把比例缩到 1/4，或接受它作为「演示装置」的定位。
-</div>
-
-<footer class="f">
-  MC 机械手搭建方案 · Create 机构版 · 控制逻辑预演 · 可迁移至 ESP32 + 舵机实物实现
-</footer>
 
 </div>
 </body>

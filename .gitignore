@@ -7,9 +7,8 @@ installer.log
 # ===== 浏览器自动化产生的临时文件 =====
 .playwright-cli/
 pwurl.txt
-preview-svg.html
 
-# ===== 过程截图（交付图除外） =====
+# ===== Minecraft / PCL 过程截图（交付图 mc-hand-render.png 不在此列） =====
 pcl-*.png
 mc-menu*.png
 mc-sp.png
@@ -20,8 +19,6 @@ mc-front.png
 mc-esc*.png
 mc-mod*.png
 mc-mods*.png
-!/mc-hand-render.png
-!/mc-create-hand-render.png
 
 # ===== 通用 =====
 node_modules/

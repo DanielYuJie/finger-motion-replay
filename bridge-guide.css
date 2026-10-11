@@ -1,0 +1,35 @@
+/* ==========================================================================
+   bridge-guide.css — page-specific layout for the CC:Tweaked bridge guide.
+   The ink hero, section rhythm, diagrams, tables, callouts, buttons, steps and
+   footer come from doc.css / components.css; this file only carries what is
+   unique to this page, and every value is a token.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Cards: the checklist cards colour their own heading by state
+   -------------------------------------------------------------------------- */
+.card-title.ok { color: var(--ok); }
+.card-title.warn { color: var(--warn); }
+
+/* --------------------------------------------------------------------------
+   Signal-chain diagram: the ASCII art must keep its exact column alignment,
+   so it scrolls sideways instead of wrapping
+   -------------------------------------------------------------------------- */
+.diagram pre {
+  white-space: pre;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-snug);
+}
+
+/* --------------------------------------------------------------------------
+   Hint line under the copy actions
+   -------------------------------------------------------------------------- */
+.hint {
+  margin: var(--sp-4) 0 0;
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+}
+
+@media print {
+  .diagram { break-inside: avoid; }
+}

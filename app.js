@@ -40,11 +40,11 @@
 
   // 本地 vendor 资源（import 需绝对/相对 URL）
   const MODEL_URL = new URL("./vendor/hand_landmarker.task", window.location.href).href;
-  const WASM_BASE = new URL("./vendor/wasm/", window.location.href).href;
+  // 注意：不加尾斜杠，vision_bundle 会再拼 "/<name>.js"，否则会出现 // 双斜杠
+  const WASM_BASE = new URL("./vendor/wasm", window.location.href).href;
   const VISION_CANDIDATES = [
     new URL("./vendor/vision_bundle.mjs", window.location.href).href,
     "./vendor/vision_bundle.mjs",
-    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/vision_bundle.mjs",
   ];
 
   function describeError(err) {
@@ -88,6 +88,8 @@
     3: "ring",
     4: "pinky",
   };
+
+  const WRIST = 0; // landmark 0，近端关节的掌骨方向参考点
 
   let stream = null;
   let handLandmarker = null;
@@ -141,17 +143,28 @@
     return (Math.acos(cos) * 180) / Math.PI;
   }
 
+  // MediaPipe 给出的是关节「内角」：手指伸直时约 180°，弯曲时变小。
+  // 全项目（3D 复现的旋转、综合弯曲角、MC 桥接的驱动量）需要的都是「屈曲角」，
+  // 即 0° = 完全伸直、数值越大弯曲越多，所以在这里统一换算一次。
+  function toFlexion(interior) {
+    return Math.max(0, 180 - interior);
+  }
+
   function computeFingerAngles(lm) {
     const out = {};
     for (const name of Object.keys(FINGER_DEFS)) {
       const def = FINGER_DEFS[name];
       const [i0, i1, i2, i3] = def.ids;
-      const a = angleBetween(lm[i0], lm[i1], lm[i2]);
-      const b = angleBetween(lm[i1], lm[i2], lm[i3]);
-      const raw = [a, b, b];
+      // 近端关节（拇指 CMC / 其余四指 MCP）需要一个比掌指关节更靠近手腕的
+      // 参考点，取手腕 landmark 0 作为掌骨方向。
+      const angles = [
+        toFlexion(angleBetween(lm[WRIST], lm[i0], lm[i1])),
+        toFlexion(angleBetween(lm[i0], lm[i1], lm[i2])),
+        toFlexion(angleBetween(lm[i1], lm[i2], lm[i3])),
+      ];
       out[name] = {
-        angles: raw,
-        flex: Math.min(100, (raw[0] + raw[1] + raw[2]) / 2.7),
+        angles: angles,
+        flex: Math.min(100, (angles[0] + angles[1] + angles[2]) / 2.7),
       };
     }
     return out;
@@ -452,9 +465,11 @@
   let bridgeOk = 0;
   let bridgeErr = 0;
 
+  // 单一事实来源：只看复选框本身。原先还有一个 window.__bridgeOn 影子开关，
+  // 两个来源可能不一致，已移除。
   function bridgeEnabled() {
-    return window.__bridgeOn === true ||
-      (document.getElementById("bridgeEnable") || {}).checked === true;
+    const cb = document.getElementById("bridgeEnable");
+    return Boolean(cb && cb.checked);
   }
 
   function setBridgeStatus(text, kind) {
@@ -746,6 +761,16 @@
   });
   mirrorCheck.addEventListener("change", applyMirror);
 
+  // MC 桥接开关（原先写在 capture.html 的内联脚本里，现已并入主脚本）
+  const bridgeCheck = document.getElementById("bridgeEnable");
+  if (bridgeCheck) {
+    bridgeCheck.addEventListener("change", function () {
+      bridgeOk = 0;
+      bridgeErr = 0;
+      setBridgeStatus(bridgeCheck.checked ? "等待数据…" : "未启用", "");
+    });
+  }
+
   fingerSelect.addEventListener("change", function () {
     const focus = fingerSelect.value;
     const focusName = focus === "-1" ? null : FINGER_BY_INDEX[focus];
@@ -783,4 +808,6 @@
   );
 
   window.__mcStart = startCamera;
+  // 供自检/联调使用：可传入 21 个 landmark 直接验算关节角
+  window.__mcAngles = computeFingerAngles;
 })();
