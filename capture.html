@@ -11,12 +11,12 @@
   <link rel="stylesheet" href="components.css" />
   <link rel="stylesheet" href="app.css" />
 </head>
-<body>
+<body class="app-body">
 
 <header class="site-header">
   <div class="site-header__inner">
     <div class="brand">
-      <div class="brand-mark" aria-hidden="true"></div>
+      <div class="brand-mark" aria-hidden="true"><span></span></div>
       <div class="brand-text">
         <h1>手指运动采集</h1>
         <p class="sub">视觉主端 · 关节角 · MC 桥接</p>
@@ -41,58 +41,84 @@
 <div class="shell">
   <main class="app-grid">
 
-    <!-- ============ 摄像头与 3D 复现 ============ -->
+    <!-- ==================== 左：取景与复现 ==================== -->
     <section class="stage" aria-label="采集画面">
-      <div class="viewport" id="viewport">
-        <video id="video" playsinline autoplay muted></video>
-        <canvas id="overlay"></canvas>
+      <div class="frame">
+        <div class="viewport" id="viewport">
+          <video id="video" playsinline autoplay muted></video>
+          <canvas id="overlay"></canvas>
 
-        <div class="placeholder" id="placeholder">
-          <div class="placeholder-icon" aria-hidden="true">
-            <svg width="52" height="52" viewBox="0 0 48 48" fill="none">
-              <rect x="6" y="14" width="28" height="20" rx="4" stroke="currentColor" stroke-width="2"/>
-              <path d="M34 20l8-4v16l-8-4V20z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-              <circle cx="16" cy="24" r="4" stroke="currentColor" stroke-width="2"/>
-            </svg>
+          <div class="vf-grid" aria-hidden="true"></div>
+          <div class="vf-corners" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <div class="vf-vignette" aria-hidden="true"></div>
+
+          <div class="placeholder" id="placeholder">
+            <div class="placeholder-icon" aria-hidden="true">
+              <svg width="56" height="56" viewBox="0 0 48 48" fill="none">
+                <rect x="6" y="14" width="28" height="20" rx="4" stroke="currentColor" stroke-width="1.6"/>
+                <path d="M34 20l8-4v16l-8-4V20z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                <circle cx="16" cy="24" r="4" stroke="currentColor" stroke-width="1.6"/>
+              </svg>
+            </div>
+            <p>点击「开启摄像头」开始采集</p>
+            <p class="hint">将手放入画面，即可看到关节点与关节角</p>
           </div>
-          <p>点击「开启摄像头」开始采集</p>
-          <p class="hint">将手放入画面，即可看到关节点与关节角</p>
+
+          <div class="hand-badge" id="handBadge" hidden>已检测到手</div>
         </div>
 
-        <div class="hand-badge" id="handBadge" hidden>已检测到手</div>
+        <!-- 仪器化读数条 -->
+        <div class="instruments">
+          <div class="instrument">
+            <span class="k">分辨率</span>
+            <span class="v" id="resolution">—</span>
+          </div>
+          <div class="instrument">
+            <span class="k">帧率</span>
+            <span class="v" id="fps">—</span>
+          </div>
+          <div class="instrument">
+            <span class="k">推理耗时</span>
+            <span class="v" id="inferMs">—</span>
+          </div>
+          <div class="instrument">
+            <span class="k">设备</span>
+            <span class="v device-name" id="deviceName">—</span>
+          </div>
+        </div>
       </div>
 
-      <div class="meta">
-        <div class="meta-item"><span class="label">分辨率</span><span class="value" id="resolution">—</span></div>
-        <div class="meta-item"><span class="label">帧率</span><span class="value" id="fps">—</span></div>
-        <div class="meta-item"><span class="label">推理</span><span class="value" id="inferMs">—</span></div>
-        <div class="meta-item"><span class="label">设备</span><span class="value device-name" id="deviceName">—</span></div>
-      </div>
-
-      <section class="replay-block" aria-label="3D 复现">
-        <div class="replay-head">
-          <h2>3D 复现建模</h2>
-          <div class="replay-actions">
+      <!-- 3D 复现 -->
+      <section class="block" aria-label="3D 复现">
+        <div class="block-head">
+          <div class="block-title">
+            <span class="tick" aria-hidden="true"></span>
+            <h2>3D 复现建模</h2>
+          </div>
+          <div class="block-actions">
             <button type="button" class="btn mini" id="btnAutoRotate">自动旋转</button>
-            <button type="button" class="btn mini" id="btnResetView">复位视角</button>
-            <span class="replay-hint">左键旋转 · 滚轮缩放 · 右键平移</span>
+            <button type="button" class="btn mini ghost" id="btnResetView">复位视角</button>
           </div>
         </div>
         <div class="replay-wrap">
           <canvas id="replayCanvas"></canvas>
           <div class="replay-legend">
             <span class="lg lm">关节点骨架</span>
-            <span class="lg finger">参数化手指（按关节角）</span>
+            <span class="lg finger">参数化手指</span>
           </div>
+          <span class="replay-hint">左键旋转 · 滚轮缩放 · 右键平移</span>
         </div>
       </section>
     </section>
 
-    <!-- ============ 控制面板 ============ -->
+    <!-- ==================== 右：控制与读数 ==================== -->
     <aside class="panel" aria-label="控制面板">
 
-      <section class="side-section">
-        <h2>采集控制</h2>
+      <section class="pane">
+        <div class="pane-head">
+          <span class="tick" aria-hidden="true"></span>
+          <h2>采集控制</h2>
+        </div>
 
         <label class="field">
           <span class="label">摄像头设备</span>
@@ -113,18 +139,11 @@
           </select>
         </label>
 
-        <label class="field checkbox">
-          <input type="checkbox" id="mirror" checked />
-          <span>镜像显示</span>
-        </label>
-        <label class="field checkbox">
-          <input type="checkbox" id="showAngles" checked />
-          <span>显示关节角数值</span>
-        </label>
-        <label class="field checkbox">
-          <input type="checkbox" id="showTrail" />
-          <span>指尖轨迹</span>
-        </label>
+        <div class="toggles">
+          <label class="check"><input type="checkbox" id="mirror" checked /><span>镜像显示</span></label>
+          <label class="check"><input type="checkbox" id="showAngles" checked /><span>显示关节角</span></label>
+          <label class="check"><input type="checkbox" id="showTrail" /><span>指尖轨迹</span></label>
+        </div>
 
         <div class="side-actions">
           <button id="btnStart" class="btn primary wide">开启摄像头</button>
@@ -134,78 +153,103 @@
         </div>
       </section>
 
-      <section class="side-section">
-        <div class="bridge-head">
+      <section class="pane" aria-label="关节角">
+        <div class="pane-head">
+          <span class="tick" aria-hidden="true"></span>
+          <h2>关节角</h2>
+          <span class="pane-note">屈曲角 · 0° 为伸直</span>
+        </div>
+
+        <div class="gauge" id="focusGauge">
+          <div class="gauge__ring" aria-hidden="true"></div>
+          <div class="gauge__body">
+            <b id="focusAngle">—</b>
+            <span>综合弯曲</span>
+          </div>
+        </div>
+
+        <div class="angle-grid" id="angleGrid">
+          <div class="angle-card" data-finger="thumb">
+            <div class="angle-card__head">
+              <span class="angle-card__name">拇指</span>
+              <span class="angle-card__tag">CMC · MCP · IP</span>
+            </div>
+            <div class="angle-rows" data-for="thumb">
+              <div class="angle-row"><span class="k">CMC</span><i class="meter"><b></b></i><span class="v" id="thumb-cmc">—</span></div>
+              <div class="angle-row"><span class="k">MCP</span><i class="meter"><b></b></i><span class="v" id="thumb-mcp">—</span></div>
+              <div class="angle-row"><span class="k">IP</span><i class="meter"><b></b></i><span class="v" id="thumb-ip">—</span></div>
+            </div>
+          </div>
+
+          <div class="angle-card" data-finger="index">
+            <div class="angle-card__head">
+              <span class="angle-card__name">食指</span>
+              <span class="angle-card__tag">MCP · PIP · DIP</span>
+            </div>
+            <div class="angle-rows" data-for="index">
+              <div class="angle-row"><span class="k">MCP</span><i class="meter"><b></b></i><span class="v" id="index-mcp">—</span></div>
+              <div class="angle-row"><span class="k">PIP</span><i class="meter"><b></b></i><span class="v" id="index-pip">—</span></div>
+              <div class="angle-row"><span class="k">DIP</span><i class="meter"><b></b></i><span class="v" id="index-dip">—</span></div>
+            </div>
+          </div>
+
+          <div class="angle-card" data-finger="middle">
+            <div class="angle-card__head">
+              <span class="angle-card__name">中指</span>
+              <span class="angle-card__tag">MCP · PIP · DIP</span>
+            </div>
+            <div class="angle-rows" data-for="middle">
+              <div class="angle-row"><span class="k">MCP</span><i class="meter"><b></b></i><span class="v" id="middle-mcp">—</span></div>
+              <div class="angle-row"><span class="k">PIP</span><i class="meter"><b></b></i><span class="v" id="middle-pip">—</span></div>
+              <div class="angle-row"><span class="k">DIP</span><i class="meter"><b></b></i><span class="v" id="middle-dip">—</span></div>
+            </div>
+          </div>
+
+          <div class="angle-card" data-finger="ring">
+            <div class="angle-card__head">
+              <span class="angle-card__name">无名指</span>
+              <span class="angle-card__tag">MCP · PIP · DIP</span>
+            </div>
+            <div class="angle-rows" data-for="ring">
+              <div class="angle-row"><span class="k">MCP</span><i class="meter"><b></b></i><span class="v" id="ring-mcp">—</span></div>
+              <div class="angle-row"><span class="k">PIP</span><i class="meter"><b></b></i><span class="v" id="ring-pip">—</span></div>
+              <div class="angle-row"><span class="k">DIP</span><i class="meter"><b></b></i><span class="v" id="ring-dip">—</span></div>
+            </div>
+          </div>
+
+          <div class="angle-card" data-finger="pinky">
+            <div class="angle-card__head">
+              <span class="angle-card__name">小指</span>
+              <span class="angle-card__tag">MCP · PIP · DIP</span>
+            </div>
+            <div class="angle-rows" data-for="pinky">
+              <div class="angle-row"><span class="k">MCP</span><i class="meter"><b></b></i><span class="v" id="pinky-mcp">—</span></div>
+              <div class="angle-row"><span class="k">PIP</span><i class="meter"><b></b></i><span class="v" id="pinky-pip">—</span></div>
+              <div class="angle-row"><span class="k">DIP</span><i class="meter"><b></b></i><span class="v" id="pinky-dip">—</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="pane" aria-label="MC 桥接">
+        <div class="pane-head">
+          <span class="tick" aria-hidden="true"></span>
           <h2>MC 桥接</h2>
           <span class="bridge-state" id="bridgeStatus" data-kind="">未启用</span>
         </div>
-        <label class="field checkbox">
-          <input type="checkbox" id="bridgeEnable" />
-          <span>推送关节角到 CC:Tweaked</span>
-        </label>
-        <p class="bridge-hint">
+        <label class="check"><input type="checkbox" id="bridgeEnable" /><span>推送关节角到 CC:Tweaked</span></label>
+        <p class="pane-note left">
           需先运行 <code>bridge_server.py</code>（127.0.0.1:8765），
           游戏内 CC 电脑再轮询该地址驱动机械手。
         </p>
       </section>
 
-      <section class="side-section angles" id="anglesPanel">
-        <div class="angles-head">
-          <h2>关节角</h2>
-          <span class="angles-hint">屈曲角 · 0° = 伸直</span>
+      <section class="pane pane-quiet">
+        <div class="pane-head">
+          <span class="tick" aria-hidden="true"></span>
+          <h2>使用提示</h2>
         </div>
-
-        <div class="angle-grid" id="angleGrid">
-          <div class="angle-card" data-finger="thumb">
-            <div class="angle-name">拇指</div>
-            <div class="angle-rows" data-for="thumb">
-              <div class="row"><span>CMC</span><b id="thumb-cmc">—</b></div>
-              <div class="row"><span>MCP</span><b id="thumb-mcp">—</b></div>
-              <div class="row"><span>IP</span><b id="thumb-ip">—</b></div>
-            </div>
-          </div>
-          <div class="angle-card" data-finger="index">
-            <div class="angle-name">食指</div>
-            <div class="angle-rows" data-for="index">
-              <div class="row"><span>MCP</span><b id="index-mcp">—</b></div>
-              <div class="row"><span>PIP</span><b id="index-pip">—</b></div>
-              <div class="row"><span>DIP</span><b id="index-dip">—</b></div>
-            </div>
-          </div>
-          <div class="angle-card" data-finger="middle">
-            <div class="angle-name">中指</div>
-            <div class="angle-rows" data-for="middle">
-              <div class="row"><span>MCP</span><b id="middle-mcp">—</b></div>
-              <div class="row"><span>PIP</span><b id="middle-pip">—</b></div>
-              <div class="row"><span>DIP</span><b id="middle-dip">—</b></div>
-            </div>
-          </div>
-          <div class="angle-card" data-finger="ring">
-            <div class="angle-name">无名指</div>
-            <div class="angle-rows" data-for="ring">
-              <div class="row"><span>MCP</span><b id="ring-mcp">—</b></div>
-              <div class="row"><span>PIP</span><b id="ring-pip">—</b></div>
-              <div class="row"><span>DIP</span><b id="ring-dip">—</b></div>
-            </div>
-          </div>
-          <div class="angle-card" data-finger="pinky">
-            <div class="angle-name">小指</div>
-            <div class="angle-rows" data-for="pinky">
-              <div class="row"><span>MCP</span><b id="pinky-mcp">—</b></div>
-              <div class="row"><span>PIP</span><b id="pinky-pip">—</b></div>
-              <div class="row"><span>DIP</span><b id="pinky-dip">—</b></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="selected-angle" id="selectedAngle">
-          重点手指综合弯曲角<b id="focusAngle">—</b>
-        </div>
-      </section>
-
-      <section class="side-section tips">
-        <h3>使用提示</h3>
-        <ul>
+        <ul class="tips">
           <li>点「开启摄像头」后浏览器会弹出权限请求，请选「允许」。</li>
           <li>手部模型已本地化，全程离线，视频不上传。</li>
           <li>要用 MC 桥接，先启动 <code>bridge_server.py</code> 再勾选开关。</li>

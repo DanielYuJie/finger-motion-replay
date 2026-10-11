@@ -29,6 +29,7 @@
   const errorBox = $("errorBox");
   const errorText = $("errorText");
   const focusAngleEl = $("focusAngle");
+  const focusGaugeEl = $("focusGauge");
   const angleCards = Array.from(document.querySelectorAll(".angle-card"));
 
   console.log("[mc] script start");
@@ -176,7 +177,16 @@
       const data = fingerAngles && fingerAngles[name];
       def.joints.forEach((joint, idx) => {
         const el = $(name + "-" + joint);
-        if (el) el.textContent = data ? fmtAngle(data.angles[idx]) : "—";
+        const deg = data ? data.angles[idx] : null;
+        if (el) el.textContent = deg === null ? "—" : fmtAngle(deg);
+        // 驱动刻度条：满量程按 120° 屈曲
+        const row = el && el.closest(".angle-row");
+        if (row) {
+          row.style.setProperty(
+            "--pct",
+            deg === null ? "0" : Math.min(100, (deg / 120) * 100).toFixed(1)
+          );
+        }
       });
     }
 
@@ -191,16 +201,29 @@
 
     if (!fingerAngles) {
       focusAngleEl.textContent = "—";
+      setGauge(0);
       return;
     }
 
+    // flex 本身就是 0–100 的归一化弯曲量，可直接当作环形表的百分比
     if (focusName) {
-      focusAngleEl.textContent = fmtAngle(fingerAngles[focusName].flex);
+      const flex = fingerAngles[focusName].flex;
+      focusAngleEl.textContent = fmtAngle(flex);
+      setGauge(flex);
     } else {
       const sum =
         Object.values(fingerAngles).reduce((acc, d) => acc + d.flex, 0) / 5;
       focusAngleEl.textContent = fmtAngle(sum);
+      setGauge(sum);
     }
+  }
+
+  function setGauge(pct) {
+    if (!focusGaugeEl) return;
+    focusGaugeEl.style.setProperty(
+      "--pct",
+      Math.max(0, Math.min(100, pct || 0)).toFixed(1)
+    );
   }
 
   function resizeOverlay() {
@@ -808,6 +831,7 @@
   );
 
   window.__mcStart = startCamera;
-  // 供自检/联调使用：可传入 21 个 landmark 直接验算关节角
+  // 供自检/联调使用：可传入 21 个 landmark 直接验算关节角，或直接渲染一组角度
   window.__mcAngles = computeFingerAngles;
+  window.__mcRender = updateAngleUI;
 })();
