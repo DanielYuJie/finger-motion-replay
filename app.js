@@ -661,6 +661,11 @@
     inferMsEl.textContent = inferAvg.toFixed(0) + " ms";
 
     const raw = result && result.landmarks ? result.landmarks[0] : null;
+    // 世界坐标（米制、腕部相对）另存一份：3D 复现与 MC 桥接用的是归一化图像坐标，
+    // 而 ORCA 这类真机重定向要的是世界坐标，不能用图像坐标代替。
+    const world = result && result.worldLandmarks ? result.worldLandmarks[0] : null;
+    lastWorldLandmarks =
+      raw && raw.length >= 21 && world && world.length >= 21 ? world : null;
     handleDetection(raw && raw.length >= 21 ? raw : null, performance.now());
   }
 
@@ -669,6 +674,8 @@
   let bridgeLast = 0;
   let bridgeOk = 0;
   let bridgeErr = 0;
+  // 最近一帧的世界坐标（21 点，米制）。只有需要真机重定向的消费方会用到。
+  let lastWorldLandmarks = null;
 
   // 单一事实来源：只看复选框本身。原先还有一个 window.__bridgeOn 影子开关，
   // 两个来源可能不一致，已移除。
@@ -701,6 +708,11 @@
           dip: d ? d.angles[2] : 0,
         };
       }
+    }
+
+    // 真机重定向（如 ORCA）要世界坐标；MC 桥接只读 fingers，多这个键无影响。
+    if (ang && lastWorldLandmarks) {
+      payload.world_landmarks = lastWorldLandmarks.map((p) => [p.x, p.y, p.z]);
     }
 
     fetch(BRIDGE_URL, {

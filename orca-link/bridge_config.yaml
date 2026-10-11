@@ -1,0 +1,58 @@
+# orca-link 映射与桥接配置
+# 这里只放"可调"的东西：关节顺序、ROM 与中立位的真值来自 ORCA 的 config.yaml。
+
+mapping:
+  # 视觉角达到多少度算满屈曲（映射到该关节 ROM 上界）。
+  # 你的 app 里 UI 刻度是 120°，硬件文档目标 60-80°，实测伸直残差约 3°。
+  # 100 是一个保守起点：手完全握紧时才会接近 ROM 上界。
+  full_flexion_deg: 100.0
+
+  # 整体幅度增益。
+  gain: 1.0
+
+  # 视觉管线给不出外展，保持 ORCA 中立位最安全（改 zero 会攥成一条线）。
+  abduction_policy: neutral
+  # 腕同理。
+  wrist_policy: neutral
+
+  # payload 只带 flex（0-100 索引）时，按 ROM 跨度分摊屈曲量。
+  flex_fallback_enabled: true
+
+  # 用 world landmarks 估外展，实验性，默认关闭。
+  abduction_from_landmarks: false
+
+  # 单帧最大关节变化（度），防甩手；设成 null 关闭限速。
+  max_step_deg: 25.0
+
+  # 逐关节覆盖，键是 ORCA 关节名。
+  per_joint_full_flexion: {}
+  per_joint_gain: {}
+
+bridge:
+  # 你的视觉主端默认 POST 到 127.0.0.1:8765（app.js 里的 BRIDGE_URL），那是 MC 桥接。
+  # 推荐改成把地址指到本服务（8766），再由下面的 forward_to 转发回 8765，
+  # 这样 ORCA 拿得到含世界坐标的完整 payload，MC 机械手也照常工作。
+  host: 127.0.0.1
+  port: 8766
+
+  # 关节目标的推送频率上限（Hz）。
+  command_hz: 30.0
+
+  # sink: print 只打日志 / orca 驱动 orca_core / grpc 走 orca_teleop ingress
+  sink: print
+
+  # 收到 /update 后把原始 payload 再转发一份给别的消费者。
+  # 转发是异步的，失败只计数、不影响主链路。留空或 null 表示不转发。
+  forward_to: "http://127.0.0.1:8765/update"
+
+  # sink=orca / 映射用哪个手模型。
+  # auto = 交给 orca_paths 自动找 orca_core 检出（推荐）；找不到会退回内置 ROM 副本。
+  # 也可以写死路径；相对路径按本文件所在目录解析。
+  hand_config: auto
+  # 没有实体手时用 orca_core 的 MockOrcaHand（内存里跑，不碰串口）。
+  mock: true
+
+  # sink=grpc 时的 orca_teleop ingress 地址。
+  grpc_server: localhost:50051
+  # 认为"手在场"的宽限期（毫秒），超过则回到中立位。
+  miss_grace_ms: 250

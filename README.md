@@ -152,6 +152,71 @@ python bridge_server.py          # 监听 127.0.0.1:8765
 
 ---
 
+## 5. ORCA 灵巧手联动（真机）
+
+把同一份视觉输出接到**真实的开源灵巧手** [ORCA Hand](https://github.com/orcahand/orca_core) 上。
+代码在 [`orca-link/`](orca-link/)，完整方案与踩坑记录见 [`docs/ORCA集成方案.md`](docs/ORCA集成方案.md)。
+
+```
+capture.html ──POST /update（多带 world_landmarks）──▶ orca-link:8766
+                                                        ├─▶ ORCA 官方重定向器 ─▶ 17 个关节角 ─▶ 真手 / 仿真
+                                                        └─▶ 转发 8765 ─▶ CC:Tweaked 机械手
+```
+
+**同一只手可以同时驱动 Minecraft 机械手和真实灵巧手。**
+
+与第 4 节的区别：MC 机械手每指只有一个自由度，所以只用到 `flex` 索引；ORCA 有 17 个自由度，
+需要 **`worldLandmarks`**（米制、腕部相对）才能让官方重定向器（Pinocchio + NLopt 逐帧优化）
+解出各指的屈伸**与外展**——外展是视觉屈曲角给不出来的。`app.js` 为此加了 12 行把世界坐标
+一并带在 payload 上（`bridge_server.py` 只读 `fingers`，所以 MC 链路不受影响）。
+
+### 快速启动
+
+```powershell
+# 0) 环境：Pinocchio 在 Windows 上没有 pip 轮子，脚本会从 conda-forge 取
+powershell -File orca-link\setup-teleop-env.ps1
+
+# 1) 机器人侧常驻（官方 orca_teleop pipeline）。先用 --drive mock / print 确认，再换 real
+<conda env>\python.exe orca-link\teleop_live.py --drive mock
+
+# 2) 适配层：收浏览器帧，经 gRPC 推给机器人侧
+<conda env>\python.exe orca-link\orca_bridge.py --sink grpc
+
+# 3) 把 app.js 的 BRIDGE_URL 改成 http://127.0.0.1:8766/update，再照第 1 节起页面
+```
+
+没有摄像头时也能验证整条链路：`python orca-link\drive_synthetic.py --seconds 9 --hz 30`
+
+### 已验证的
+
+| 验证 | 结果 |
+|---|---|
+| 屈曲角 → ORCA 关节映射（ROM 夹取、拇指键语义、限速、关节顺序） | 28/28 |
+| gRPC 回环（对 orca_teleop **真实** `IngressServer` 原件） | 63 个浮点误差 1.85e-09 |
+| `MockOrcaHand` 端到端（命令值落到关节） | 最大误差 0.000° |
+| 完整链路 landmark → gRPC → 官方重定向器 → 17 关节角 | 10/10 |
+| 常驻遥操作（三进程、30Hz） | 270 帧全送达；张开→握拳→张开在 `index_mcp` 上 9.2 → 83.1 → 9.1 |
+
+**尚未验证**：重定向质量。上面用的是手工合成的 landmark，解剖学上不严谨，
+需要真实摄像头数据来评估。
+
+### Windows 上的四个坑（都已在代码里绕开）
+
+1. **`adaptive` 额外依赖装不上**：`pin` / `cmeel-urdfdom` / `cmeel-tinyxml2` 在 PyPI 上
+   **从来没有 Windows 轮子**。绕法：Pinocchio 走 conda-forge，`orca_teleop` 用 `--no-deps`。
+2. **模型版本要用「v2 手配置 + v1 URDF」**：`orcahand_description` 里 v2 的 URDF/MJCF 是
+   CAD 命名（`I-AP-R_d95d02d1`），v2 帧表要的语义名一个都对不上；v1 URDF 才是语义命名。
+3. **上游 `joint_name_aliases` 方向反了**：`{thumb_pip: thumb_cmc}` 两种组合都不生效，
+   改成 `{thumb_cmc: thumb_pip}` 才打通。
+4. **重定向配置必须纯 ASCII**：`adaptive_analytical.py` 用 `open()` 读配置但没给 `encoding`，
+   中文 Windows（cp936）下**上游自带的配置本身就加载不了**（含 em-dash）；且 GBK 解 UTF-8
+   是按字节位置对齐的，所以这个 bug 时隐时现。
+
+授权提示：`orca_core` 与 `orcahand_description` 是 MIT；**`orca_teleop` 没有 LICENSE 文件、
+issues 也已关闭**，商用前请自行确认。
+
+---
+
 ## 目录结构
 
 ```
@@ -168,6 +233,8 @@ python bridge_server.py          # 监听 127.0.0.1:8765
 ├── doc.css / report.css                   # 文档主题与报告专用样式
 ├── 淘宝3D打印交付包.md                     # 硬件采购/下单文档
 ├── 最小可抄文件清单.md                     # 开源参考清单
+├── docs/ORCA集成方案.md                    # ORCA 灵巧手联动的完整方案
+├── orca-link/                             # 视觉 → ORCA 灵巧手适配层（第 5 节）
 └── vendor/                                # MediaPipe + Three.js（离线）
 ```
 
@@ -183,4 +250,5 @@ python bridge_server.py          # 监听 127.0.0.1:8765
 |------|------|
 | 网页（采集 / 3D / 文档） | Chrome / Edge / Firefox，需摄像头权限，建议 https 或 localhost |
 | MC 桥接 | Python 3.9+（仅标准库）；Minecraft 1.20.1 + Forge + Create + CC:Tweaked |
+| ORCA 灵巧手联动 | Python 3.12（orca_teleop 限定 `<3.13`）+ conda-forge 的 Pinocchio/NLopt；需单独 clone `orca_core` / `orca_teleop` / `orcahand_description` |
 | 3D 打印 | 桌面 FDM 打印机，PLA，层高 0.2mm |

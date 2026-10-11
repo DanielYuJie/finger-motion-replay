@@ -20,6 +20,12 @@ mc-esc*.png
 mc-mod*.png
 mc-mods*.png
 
+# ===== orca-link：本地环境与生成物（不入库） =====
+orca-link/.venv/
+orca-link/proto_gen/
+orca-link/vendor/
+orca-link/*.log
+
 # ===== 通用 =====
 node_modules/
 __pycache__/
