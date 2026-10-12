@@ -194,6 +194,83 @@ git clone https://github.com/orcahand/orcahand_hardware.git   # 约 850 MB
 皮肤两选一：**TPU 直打（快，3MF 已含 `(TPU)` 盘）** 或 **硅胶浇注**。
 硅胶路线要额外打印模具（`SiliconeMolds-1100.3mf`，其中一块用 ~85A 软 TPU）+ 硅胶 + 脱泡。
 
+### 用拓竹 A1 打印要注意什么
+
+官方参数取自 **BambuStudio 仓库的机器配置**（`resources/profiles/BBL/machine/`），
+不是二手资料：
+
+| 参数 | A1 | A1 mini |
+|---|---|---|
+| `printable_area` | **0x0 → 256x256** | 0x0 → 180x180 |
+| `printable_height` | **256** | 180 |
+| `printer_structure` | **i3（床动式）** | i3 |
+| 可选喷嘴 | 0.2 / 0.4 / 0.6 / 0.8 | 同 |
+| `auxiliary_fan` | **0（无辅助风扇）** | 0 |
+
+#### ① 尺寸：完全不是问题
+
+我实测了 18 个零件（含体积最大的 4 个）的包围盒：
+
+| 零件 | 尺寸 (mm) |
+|---|---|
+| **ForeArmStructure** | 88.0 × **122.1** × 91.0 ← 最大单边 |
+| **HullFront** | 22.0 × 93.0 × **110.1** ← 最高 |
+| L/R-Carpals | 91.9 × 38.0 × 96.0 |
+| WristStructure | 96.0 × 93.0 × 46.5 |
+| I-PP | 19.0 × 18.0 × 54.5 |
+
+**18 个全部 A1 放得下，也全部 A1 mini 放得下**（最大 122.1 mm vs 256 / 180）。
+换机器不需要切件或分件打印。
+
+#### ② ⚠️ 官方排盘是按 X1/P1 排的，A1 要让切片器重查避让
+
+A1 配置里这几项是**挤出头碰撞约束**，而 X1/P1 是 CoreXY、A1 是床动式，两者间隙不同：
+
+```
+extruder_clearance_max_radius : 73
+extruder_clearance_dist_to_rod: 56.5   （对象高于 extruder_clearance_height_to_rod: 25 时生效）
+head_wrap_detect_zone         : 226x224 / 256x224 / 256x256 / 226x256
+```
+
+也就是说：**高件之间、以及高件与边缘之间，A1 要求的最小间距与 X1/P1 不同**。
+打开官方 3MF、把机型切成 `Bambu Lab A1 0.4 nozzle` 后，**务必让 Bambu Studio 重新做一次
+排盘检查**（它会给出"间距不足"的提示并按需自动重排），不要直接沿用原来的摆位。
+本方案里 `HullFront`（110 mm）、`ForeArmStructure`（91 mm）、`CORE-R`（67 mm）、
+`I-PP`（55 mm）都超过 25 mm 阈值，属于受约束的件。
+
+#### ③ TPU 必须走外置料盘，不能走 AMS
+
+BambuStudio 里 TPU 的配置是**两套分开的**：
+`Bambu TPU 95A @BBL A1` 与 `Bambu TPU for AMS @BBL A1`——后者是专门为 AMS 做的硬一些的料。
+普通 TPU（以及 ORCA 需要的 **~85A**，比官方 90A 还软）**只能外置料盘 + 直驱**，慢速打印。
+
+因此 `(TPU)` 盘和 PLA 盘要**分两次任务**打，中间手动换料；
+或者干脆不买 AMS（ORCA 全是单色 PLA，AMS 只省换料，不是必需）。
+
+#### ④ 开放式机型 → 只打 PLA/PETG/TPU
+
+ORCA 官方用 PLA（eSUN），正好是 A1 的强项。**别换 ABS/ASA**——A1 没有恒温腔，
+必然翘边。大面积件（`L/R-Carpals` 92×96、`ForeArmStructure` 122×91）建议**加 brim**、
+擦净 PEI 板。
+
+#### ⑤ 换机器后必须重新切片
+
+3MF 里带的是原机器的配置，**不能沿用**。流程：Bambu Studio 打开
+`Prints-1100.3mf` → 机型选 `Bambu Lab A1 0.4 nozzle` → 选一个 A1 的 process 配置
+（如 `0.20mm Standard @BBL A1`）→ 重新切片。
+
+#### ⑥ 公差件：先用 0.4，不够再上 0.2
+
+A1 支持 0.2 喷嘴。但**先别急着换**——按 §3 的阶段 0 用 0.4 打样品干装，
+量出销孔/轴承孔实际偏多少，再决定是换 0.2 喷嘴还是扩孔/铰孔。
+v2.1 的卖点之一就是 "improved tolerances"，说明官方也在意这个。
+
+#### ⑦ 时间预期
+
+60 个 PLA 件 + 9 个 TPU 件（88 MB STL）。床动式机型速度不如 CoreXY，
+按官方"装配 <8 h"的前提是**零件已经打好**，所以**打印机时是数天量级**，
+建议分批打（先手指+腕骨，验证公差后再打大的）。
+
 ---
 
 ## 5. 采购清单
