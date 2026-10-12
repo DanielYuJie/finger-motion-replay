@@ -203,6 +203,13 @@ powershell -File orca-link\setup-teleop-env.ps1
 三段代表帧：驱动前（左）、推入"握拳"landmark 时（中）、推回"张开"时（右）。
 跑法：`orca-link\teleop_live.py --drive sim`，渲染帧写到 `orca-link/sim_frames/`。
 
+想看**实时动画**就开 MuJoCo 交互窗口（`--sim-render human`），再用连续手势驱动它：
+
+![实时波浪动作](orca-link/docs/orca-sim-live.gif)
+
+这段 GIF 是从正在运行的窗口直接录的（44 帧 / 1.94 MB），所以能看到 MuJoCo 自己的
+控制面板——是真实窗口而非重新渲染。用法见 [orca-link/README.md](orca-link/README.md)。
+
 > 中间那帧主要是**掌指关节在弯、远端指节偏直**——不是重定向器的问题，而是合成 landmark
 > 解剖学上不严谨（PIP 的命令值本身只有 -10.0 → -8.7）。屈伸分配是否合理，需要真实摄像头数据。
 

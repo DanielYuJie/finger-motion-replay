@@ -66,6 +66,34 @@ Invoke-RestMethod -Uri http://127.0.0.1:8766/orca_joints
 动作往返成立。注意中间那帧主要是**掌指关节在弯、远端指节偏直**——这是合成 landmark
 不严谨导致的（PIP 的命令值本身只有 -10.0 → -8.7），不是重定向器的问题。
 
+### 看实时动画（MuJoCo 交互窗口）
+
+静态图看不够就直接开窗口，手掌会实时跟着输入动；窗口本身可鼠标旋转/缩放：
+
+```powershell
+# 终端 1：实时窗口（会弹出 "MuJoCo : ORCA hand right scene"）
+<conda env>\python.exe teleop_live.py --drive sim --sim-render human --sim-out=
+
+# 终端 2：桥接
+<conda env>\python.exe orca_bridge.py --sink grpc
+
+# 终端 3：连续手势驱动（--seconds 0 = 一直跑）
+<conda env>\python.exe drive_gestures.py --pattern wave --seconds 0
+```
+
+`drive_gestures.py` 与 `drive_synthetic.py` 的区别：后者只在"张开/握拳"两个离散姿态间跳，
+适合做静态对比；前者按正弦连续改变屈曲量，实时窗口里才是平滑的动画。两种模式：
+`--pattern pulse`（五指同步开合）与 `--pattern wave`（五指依次屈伸）。
+
+![实时波浪动作](docs/orca-sim-live.gif)
+
+上面这段 GIF 是从**正在运行的窗口**直接录的（`PrintWindow` 抓取 + 调色板量化，
+44 帧 / 1.94 MB），所以画面里能看到 MuJoCo 自己的控制面板——它是真实窗口，不是重新渲染。
+六格定帧见 [docs/orca-sim-live-strip.png](docs/orca-sim-live-strip.png)。
+
+录制期间实测：窗口内容每 0.7~0.9 秒有 **7~13% 的像素明显变化**，相邻帧平均差 6.5~10.2，
+确认是连续运动而非冻结画面。
+
 **坑 5：官方 sim sink 拼错了模型目录名。**
 `OrcaHandSimSink._resolve_retarget_model_path` 找的是
 `models/<version>/orcahand_<env>/config.yaml`（**下划线**），而 orca_core 里实际是

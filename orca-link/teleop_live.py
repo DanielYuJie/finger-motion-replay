@@ -43,22 +43,26 @@ WIN_CFG = HERE / "configs" / "adaptive_analytical_orca_windows.yaml"
 os.environ.setdefault("ORCAHAND_DESCRIPTION_DIR", str(DESC))
 
 
-def build_sim_sink(model_path: Path, out_dir: Path, every: int):
+def build_sim_sink(model_path: Path, out_dir: Path | None, every: int, render_mode: str):
     """构造官方的 MuJoCo 仿真 sink，并修掉上游的两处问题。
 
     1. `OrcaHandSimSink._resolve_retarget_model_path` 拼的是
        `models/<version>/orcahand_<env>`（下划线），而 orca_core 里实际是
        `orcahand-right`（连字符），于是返回 None 并在 connect 时抛 RuntimeError。
-    2. 上游 sink 只在 render_mode="human" 时出画面；这里用 rgb_array 并把渲染帧
-       按节奏落盘，好让没有显示器的一侧也能看到仿真结果。
+    2. 上游 sink 只在 `render_mode="human"` 时出画面；`rgb_array` 下按节奏把渲染帧
+       落盘，好让没有显示器的一侧也能看到仿真结果。
+
+    render_mode="human" 会开一个 MuJoCo 交互窗口（实时动画）。该 viewer 必须由主线程
+    创建，而 `pipeline.run()` 正好在主线程调 `sink.connect()`，所以能正常弹窗。
     """
     from orca_teleop.sim import OrcaHandSimSink, SimCameraConfig
 
     class SnapshotSimSink(OrcaHandSimSink):
         def __init__(self, **kwargs) -> None:
             super().__init__(**kwargs)
-            self._out_dir = Path(out_dir)
-            self._out_dir.mkdir(parents=True, exist_ok=True)
+            self._out_dir = Path(out_dir) if out_dir is not None else None
+            if self._out_dir is not None:
+                self._out_dir.mkdir(parents=True, exist_ok=True)
             self._every = max(1, int(every))
             self._steps = 0
             self.frames: list[dict] = []
@@ -69,7 +73,7 @@ def build_sim_sink(model_path: Path, out_dir: Path, every: int):
         def dispatch_action(self, action) -> None:
             super().dispatch_action(action)
             self._steps += 1
-            if self._steps % self._every == 0:
+            if self._out_dir is not None and self._steps % self._every == 0:
                 self._snapshot(action)
 
         def _snapshot(self, action) -> None:
@@ -94,7 +98,7 @@ def build_sim_sink(model_path: Path, out_dir: Path, every: int):
     return SnapshotSimSink(
         env_name="right",
         version="v2",
-        render_mode="rgb_array",
+        render_mode=render_mode,
         camera_config=SimCameraConfig(name="frontal", width=480, height=360),
     )
 
@@ -212,8 +216,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--backend", default="adaptive_analytical", choices=["adaptive_analytical", "rmsprop"])
     parser.add_argument("--neutral-on-loss", action="store_true", help="手离开 1s 后回中立位")
     parser.add_argument("--visualize-landmarks", action="store_true")
-    parser.add_argument("--sim-out", default="sim_frames", help="--drive sim 时渲染帧存到哪")
+    parser.add_argument("--sim-out", default="sim_frames", help="--drive sim 时渲染帧存到哪（留空则不存）")
     parser.add_argument("--sim-every", type=int, default=8, help="--drive sim 时每 N 步存一帧")
+    parser.add_argument("--sim-render", choices=["rgb_array", "human"], default="rgb_array",
+                        help="human 会开一个 MuJoCo 交互窗口（实时动画）")
     args = parser.parse_args(argv)
 
     for label, path in (("model", args.model), ("urdf", args.urdf), ("retarget-config", args.retarget_config)):
@@ -224,8 +230,12 @@ def main(argv: list[str] | None = None) -> int:
     from orca_teleop.pipeline import run
 
     if args.drive == "sim":
-        sink = build_sim_sink(Path(args.model), Path(args.sim_out), args.sim_every)
-        print(f"[live] sink=sim：orca_sim / MuJoCo，渲染帧写入 {Path(args.sim_out).resolve()}")
+        out_dir = Path(args.sim_out) if args.sim_out else None
+        sink = build_sim_sink(Path(args.model), out_dir, args.sim_every, args.sim_render)
+        if args.sim_render == "human":
+            print("[live] sink=sim：MuJoCo 交互窗口已请求，实时画面应出现在桌面上")
+        if out_dir is not None:
+            print(f"[live] 渲染帧同时写入 {out_dir.resolve()}")
     else:
         sink = JointSink(args.drive, Path(args.model), args.hz, args.neutral_on_loss)
     print(f"[live] 监听 0.0.0.0:{args.port}（gRPC HandFrame）")
