@@ -68,22 +68,35 @@ MuJoCo 里跑通的那只手的物理版本。
 
 这不是可选项——官网明确写 v2.1 的改进之一就是
 **"metal spool holders: Spool holders and tensioners are metal in v2.1, printed in v2.0"**。
-也就是说 v2.0 可以打印这些件，**v2.1 用的是金属件**。需要找机加工（铝），
-或自行评估用高填充打印件替代（线轴座承力，替代有风险）。
+也就是说 v2.0 可以打印这些件，**v2.1 用的是金属件**。
+
+已确认的材料/规格（来自图纸本身）：
+
+| 件 | 图纸信息 |
+|---|---|
+| `FrankaConnector` | **MATERIAL: Aluminium 6061-T6**；2× **M4×0.7**-6H 通孔；2× **M5×0.8**-6H 通孔；4× **M3×0.5**-6H 深 5 mm（图纸 Rev. 01.09.2025） |
+| `SpoolHolder_CNC` | 尺寸 113.28 / 91.73 / 68.58、Ø4、Ø3.4；**图纸文本中未标注材料**（材料未确认） |
 
 同一条官网说明还提到：**v2.1 里腱绳只接触金属与光滑 PTFE，永不接触 PLA**（v2.0 没有 PTFE）。
 PTFE 管在这版里是**功能性必需件**，不是可省的细节。
 
 
+
 ### ③ 成本几乎全在 17 个舵机
+
+型号来自 **orca_core 仓库**（`constants.py` 与 `dynamixel_client.py`；论文全文**未点名任何舵机型号**）：
 
 | 家族 | 腕（×1） | 指（×16） |
 |---|---|---|
-| Dynamixel | XC430-T240BB-T | XC330-T288-T |
-| Feetech | HLS3930 | HLS3915 |
+| Dynamixel | **XC430-T240BB-T** | **XC330-T288-T** |
+| Feetech | **HLS3930** | **HLS3915** |
 
 两家族价差很大，**选型直接决定预算量级**。3MF 里盘 1（DYNAMIXEL）与盘 2（FEETECH）
 只是塔身不同，其余盘通用——所以**选型可以晚于打印决定**。
+
+Dynamixel 路线还需 **U2D2 + Power Hub Board（PHB）+ 12V 电源**
+（`orca_core/docs/.../setting-up-dynamixels.md` 逐字：Protocol 2.0、Baudrate 57600 与 3Mbps、
+ID 范围 0–17）。**电源电流规格官方未给**。
 
 ---
 
@@ -148,22 +161,35 @@ git clone https://github.com/orcahand/orcahand_hardware.git   # 约 850 MB
 **可以现在确定的部分：**
 
 - **舵机 ×17**：16 指 + 1 腕，按 §1③ 选家族
+- **腱绳**：**Ø0.4 mm 尼龙编织绳**（论文原文 "two fishing lines (Nylon fibers braided into a
+  0.4 mm diameter rope)"），**每个关节 2 根**（flexor + extensor，腕除外）
 - **驱动/接口**：
   - v2 手自带的 **ORCA controller board** → Windows 上免驱，显示为两个 `USB Serial Device (COMx)`
-  - 若用 U2D2（Dynamixel 路线）：还需 Power Hub Board + **12V 电源**
+  - 若用 U2D2（Dynamixel 路线）：还需 **Power Hub Board + 12V 电源**
   - Feetech 路线：CH340 或 CP210x 适配器
-- **电机接线板 PCB**：用 `electronics/ORCA_Motor_Connectors_Gerber` 走 EasyEDA/JLCPCB 打样
-- **PTFE 管**：每指 AP 2 根（宽孔对，长约 8–10 mm，两端各留 ~1 mm）；
-  腕骨 **32 根**；塔身 **32 根**
+- **电机接线板 PCB**：用 `electronics/ORCA_Motor_Connectors_Gerber` 走 EasyEDA 打样
+  （BOM 里只有 1 行物料：`PM254V-11-03-H85`，JLCPCB 料号 `C541850`）
+- **PTFE 管**：每指 AP 2 根（**长 8–10 mm**，两端各留 ~1 mm）；腕骨 **32 根**；塔身 **32 根**
 - **销**：拇指 AP 用 **2×30** ×2；腕关节用 **3×50**（3×45 勉强可用）×2
 - **轴承**：拇指 AP 用 **4×8×3**；腕轴两端各一个 **8×13×4**
 - **M4 螺钉**：塔身用，外面套 PTFE 管
+- **硅胶**（做硅胶皮肤时）：官网指名 **Dragon Skin 10 NV**（Smooth-On）
+- **PLA**：官网指名 **eSUN**。官网原话："You supply the PLA and silicone yourself.
+  These are the exact materials we use."
 
-**仍需自行补全的部分**（仓库未列，去装配视频/Discord/官方套件确认）：
-腱绳（材质与直径）、弹簧、其余紧固件规格与数量、硅胶型号与硬度。
+**仍需自行补全的部分**：螺丝/弹簧/磁铁的完整数量与规格、硅胶硬度以外的浇注工艺参数。
 
-> 我不在这里编造价格。唯一可靠的总量数字是论文的 <2000 CHF；**舵机选型是最大变量**，
-> 其余按 §5 清单逐项询价即可。
+> 官方 v2 BOM（**含数量与采购说明**）在这个 Google Sheets：
+> <https://docs.google.com/spreadsheets/d/1KuzqoXPn165d440Sw2QLM02ne0wbVuQrWCZv1HRueVI/edit>
+> （我在本机**打不开** `docs.google.com`，连接超时——需要你在能访问 Google 的网络打开。）
+> v1 legacy 的 BOM 另附**价格、采购链接与运费估算**：<https://www.orcahand.com/legacy/files>
+
+⚠️ **注意**：官网明确写 **"orcahand touch is open-source; its tactile sensing module
+remains proprietary"**——触觉模块不开源。想做 2100 touch 的**自造**版本，这一块拿不到设计；
+这也是把 base 作为起点的又一个理由。
+
+> 我**不编造**逐项价格。论文全文**没有成本表**（只有一个关节活动范围表），
+> 唯一的总量数字是论文的 <2000 CHF 与官网的 $3,500/$6,100。
 
 ---
 
@@ -243,8 +269,10 @@ git clone https://github.com/orcahand/orcahand_hardware.git   # 约 850 MB
 | 材料成本 | **< 2000 CHF** | 论文口径；**舵机选型是最大变量** |
 | 对照：买成品 | **$3,500**（base）/ **$6,100**（touch） | 官网定价，2026 年查询 |
 
-> 我**不编造**逐项价格。唯一可靠的两个总量数字是论文的 <2000 CHF 与官网的 $3,500/$6,100；
-> 舵机家族选型是最大变量，其余按 §5 清单逐项询价。
+> 我**不编造**逐项价格。论文全文**没有成本表**（我逐字核过：全文唯一表格是关节活动范围表，
+> `CHF|USD|price|cost|BOM` 均无逐项数字），唯一可靠的两个总量数字是论文的 <2000 CHF
+> 与官网的 $3,500/$6,100；**舵机家族选型是最大变量**，其余按 §5 清单逐项询价。
+> 带数量与采购说明的官方 v2 BOM 在 §5 给出的 Google Sheets 里。
 
 ---
 
@@ -263,7 +291,39 @@ git clone https://github.com/orcahand/orcahand_hardware.git   # 约 850 MB
 
 ---
 
-## 11. 参考
+## 11. 规格速查（论文逐字，可拿来验收）
+
+装完之后可以直接照这些数字验收。全部出自论文原文，非我推断。
+
+| 项目 | 数值 |
+|---|---|
+| 自由度 | **17**（5 指 + 1 可动手腕） |
+| 重量 | 约 **1.2 kg**，尺寸接近成年人手 |
+| 抓握负载 | 四指 **10.5 kg（103 N）**；仅食指 **2 kg（19.6 N）**（测试条件：位置控制模式恒 **600 mA**） |
+| 手腕 | 屈伸各 **60°**（人手约 80°），**GT2 玻纤增强同步带**传动 |
+| 拇指 | 掌内旋 **15°** |
+| 关节精度 | AprilTag 测角 **σ = 0.08°** |
+| 端到端时延 | 平均 **< 0.2 s**（主要来自软件链路）；论文未给 Hz |
+| 控制率（仓库数字） | 17 电机单总线 3 Mbaud：朴素读写 ~12 ms（**~85 Hz**），优化后 ~4.5 ms（**~224 Hz**） |
+| 耐久 | 论文 **> 10000 次循环 ≈ 20 小时**；官网现行额定 **200,000 次** |
+| 触觉（2100 touch） | FSR **RP-C7.6-ST**，五指指尖，**二值**（不做力幅），10 kΩ 分压 + 5V + Arduino Nano Every |
+
+论文唯一的表格——关节活动范围（TABLE I）：
+
+| 关节 | 第 2–5 指 屈 / 伸 | 拇指 屈 / 伸 |
+|---|---|---|
+| IP | — | 100° / 20° |
+| PIP | 130° / 20° | — |
+| MCP | 110° / 20° | 115° / 20° |
+| ABD | 30° / 30° | 45° / 45° |
+| CMC | — | 48° / 53° |
+
+> 注意这是**论文 v2.0 的标称范围**；`orca_core` 里 `config.yaml` 的 `joint_roms`
+> 才是装配后逐台标定、软件实际夹取用的范围，两者不必一致。
+
+---
+
+## 12. 参考
 
 **官方（BOM 与采购问题优先看这里）**
 
