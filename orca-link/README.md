@@ -40,7 +40,42 @@ Invoke-RestMethod -Uri http://127.0.0.1:8766/orca_joints
 
 ---
 
-## sink 三种模式
+## 机器人侧的四种 drive
+
+`teleop_live.py` 起的是官方 `pipeline.run()`，`--drive` 决定关节目标最终去哪：
+
+| drive | 作用 | 需要 |
+|------|------|------|
+| `print` | 只打印关节角 | 无 |
+| `mock` | `MockOrcaHand`，内存里跑 | `orca_core` |
+| `sim` | **`orca_sim` 的 MuJoCo 仿真**，有物理、会渲染画面 | `mujoco` + `gymnasium` + `orca_sim` |
+| `real` | 真机（会连接、会标定、会动） | 硬件 |
+
+```powershell
+<conda env>\python.exe teleop_live.py --drive sim                  # 仿真，帧写到 sim_frames/
+<conda env>\python.exe teleop_live.py --drive sim --sim-every 6    # 每 6 步存一帧
+<conda env>\python.exe teleop_live.py --drive real                 # 真机
+```
+
+### 仿真实测（无硬件）
+
+同一套链路驱动 `orca_sim` 的 v2 手，30Hz 推入"张开 → 握拳 → 张开"：
+
+![张开 → 握拳 → 张开](docs/orca-sim-open-fist-open.png)
+
+动作往返成立。注意中间那帧主要是**掌指关节在弯、远端指节偏直**——这是合成 landmark
+不严谨导致的（PIP 的命令值本身只有 -10.0 → -8.7），不是重定向器的问题。
+
+**坑 5：官方 sim sink 拼错了模型目录名。**
+`OrcaHandSimSink._resolve_retarget_model_path` 找的是
+`models/<version>/orcahand_<env>/config.yaml`（**下划线**），而 orca_core 里实际是
+`orcahand-right`（**连字符**），于是返回 `None` 并在 `connect()` 抛 `RuntimeError`。
+`teleop_live.py` 用子类覆盖该方法绕开，同时借它把渲染帧落盘（上游只在
+`render_mode="human"` 时出画面，无显示器的一侧看不到）。
+
+---
+
+## sink 三种模式（`orca_bridge.py`，与上面的 drive 是两回事）
 
 | sink | 作用 | 依赖 |
 |------|------|------|

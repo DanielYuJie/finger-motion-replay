@@ -176,8 +176,8 @@ capture.html ──POST /update（多带 world_landmarks）──▶ orca-link:8
 # 0) 环境：Pinocchio 在 Windows 上没有 pip 轮子，脚本会从 conda-forge 取
 powershell -File orca-link\setup-teleop-env.ps1
 
-# 1) 机器人侧常驻（官方 orca_teleop pipeline）。先用 --drive mock / print 确认，再换 real
-<conda env>\python.exe orca-link\teleop_live.py --drive mock
+# 1) 机器人侧常驻（官方 orca_teleop pipeline）。没有硬件就先用 --drive sim（MuJoCo 仿真，会出画面）
+<conda env>\python.exe orca-link\teleop_live.py --drive sim     # 或 mock / print / real
 
 # 2) 适配层：收浏览器帧，经 gRPC 推给机器人侧
 <conda env>\python.exe orca-link\orca_bridge.py --sink grpc
@@ -196,6 +196,15 @@ powershell -File orca-link\setup-teleop-env.ps1
 | `MockOrcaHand` 端到端（命令值落到关节） | 最大误差 0.000° |
 | 完整链路 landmark → gRPC → 官方重定向器 → 17 关节角 | 10/10 |
 | 常驻遥操作（三进程、30Hz） | 270 帧全送达；张开→握拳→张开在 `index_mcp` 上 9.2 → 83.1 → 9.1 |
+| **MuJoCo 仿真（无硬件）** | 同一链路驱动 `orca_sim` 的 v2 手，渲染帧实测动作往返成立 ↓ |
+
+![张开 → 握拳 → 张开](orca-link/docs/orca-sim-open-fist-open.png)
+
+三段代表帧：驱动前（左）、推入"握拳"landmark 时（中）、推回"张开"时（右）。
+跑法：`orca-link\teleop_live.py --drive sim`，渲染帧写到 `orca-link/sim_frames/`。
+
+> 中间那帧主要是**掌指关节在弯、远端指节偏直**——不是重定向器的问题，而是合成 landmark
+> 解剖学上不严谨（PIP 的命令值本身只有 -10.0 → -8.7）。屈伸分配是否合理，需要真实摄像头数据。
 
 **尚未验证**：重定向质量。上面用的是手工合成的 landmark，解剖学上不严谨，
 需要真实摄像头数据来评估。

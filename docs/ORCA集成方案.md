@@ -325,6 +325,25 @@ POST 带 `world_landmarks` 的 payload 仍返回 `{"ok":true,...}`，`GET /angle
 orca-link 的 `forward_to`（默认已开）把 payload 转发回 8765——**同一只手可以同时驱动
 MC 机械手和 ORCA 灵巧手**。
 
+### 仿真也跑通了（MuJoCo，无需硬件）
+
+`teleop_live.py --drive sim` 把关节目标灌进 `orca_sim` 的 v2 手（MuJoCo），30Hz 推入
+"张开 → 握拳 → 张开"：
+
+![张开 → 握拳 → 张开](../orca-link/docs/orca-sim-open-fist-open.png)
+
+动作往返成立。这是**目前最强的端到端证据**：从视觉 payload 到有物理、有渲染的机械手，
+中间每一段用的都是真实代码。
+
+⚠️ 中间那帧主要是**掌指关节（MCP）在弯、远端指节偏直**。这是合成 landmark 不严谨导致的
+（PIP 的命令值本身只有 -10.0 → -8.7），**不是重定向器的问题**；屈伸分配是否合理仍需真实
+摄像头数据来评估。
+
+**第 5 个坑**：官方 `OrcaHandSimSink._resolve_retarget_model_path` 找的是
+`models/<version>/orcahand_<env>/config.yaml`（**下划线**），而 orca_core 里实际是
+`orcahand-right`（**连字符**）→ 返回 `None` → `connect()` 抛 `RuntimeError`。
+用子类覆盖该方法即可，顺便把渲染帧落盘（上游只在 `render_mode="human"` 时出画面）。
+
 **第 4 个坑（已修）**：`adaptive_analytical.py` 用 `open()` 读配置但没给 `encoding`，
 中文 Windows（cp936）下**上游自带的配置本身就加载不了**——它含一个 em-dash，实测
 `'gbk' codec can't decode byte 0x94 in position 2037`。GBK 解 UTF-8 是按位置对齐的，

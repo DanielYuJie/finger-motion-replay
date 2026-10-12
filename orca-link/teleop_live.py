@@ -43,6 +43,62 @@ WIN_CFG = HERE / "configs" / "adaptive_analytical_orca_windows.yaml"
 os.environ.setdefault("ORCAHAND_DESCRIPTION_DIR", str(DESC))
 
 
+def build_sim_sink(model_path: Path, out_dir: Path, every: int):
+    """构造官方的 MuJoCo 仿真 sink，并修掉上游的两处问题。
+
+    1. `OrcaHandSimSink._resolve_retarget_model_path` 拼的是
+       `models/<version>/orcahand_<env>`（下划线），而 orca_core 里实际是
+       `orcahand-right`（连字符），于是返回 None 并在 connect 时抛 RuntimeError。
+    2. 上游 sink 只在 render_mode="human" 时出画面；这里用 rgb_array 并把渲染帧
+       按节奏落盘，好让没有显示器的一侧也能看到仿真结果。
+    """
+    from orca_teleop.sim import OrcaHandSimSink, SimCameraConfig
+
+    class SnapshotSimSink(OrcaHandSimSink):
+        def __init__(self, **kwargs) -> None:
+            super().__init__(**kwargs)
+            self._out_dir = Path(out_dir)
+            self._out_dir.mkdir(parents=True, exist_ok=True)
+            self._every = max(1, int(every))
+            self._steps = 0
+            self.frames: list[dict] = []
+
+        def _resolve_retarget_model_path(self, version):  # noqa: ARG002
+            return str(model_path)
+
+        def dispatch_action(self, action) -> None:
+            super().dispatch_action(action)
+            self._steps += 1
+            if self._steps % self._every == 0:
+                self._snapshot(action)
+
+        def _snapshot(self, action) -> None:
+            import numpy as np
+            from PIL import Image
+
+            image = self.get_observation().images.get("frontal")
+            if image is None:
+                return
+            name = f"step{self._steps:05d}.png"
+            Image.fromarray(np.asarray(image, dtype=np.uint8)).save(self._out_dir / name)
+            values = action.as_dict()
+            self.frames.append(
+                {
+                    "step": self._steps,
+                    "file": name,
+                    "index_mcp": float(values.get("index_mcp", float("nan"))),
+                    "middle_mcp": float(values.get("middle_mcp", float("nan"))),
+                }
+            )
+
+    return SnapshotSimSink(
+        env_name="right",
+        version="v2",
+        render_mode="rgb_array",
+        camera_config=SimCameraConfig(name="frontal", width=480, height=360),
+    )
+
+
 class JointSink:
     """消费重定向后的关节目标。
 
@@ -146,7 +202,8 @@ class JointSink:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="ORCA 机器人侧常驻进程（官方 pipeline）")
-    parser.add_argument("--drive", choices=["print", "mock", "real"], default="print")
+    parser.add_argument("--drive", choices=["print", "mock", "real", "sim"], default="print",
+                        help="sim = orca_sim 的 MuJoCo 仿真（无需硬件，会渲染画面）")
     parser.add_argument("--port", type=int, default=50051)
     parser.add_argument("--hz", type=float, default=30.0, help="关节目标下发频率上限")
     parser.add_argument("--model", default=str(V2_CFG), help="ORCA 手配置（默认 v2 右手）")
@@ -155,6 +212,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--backend", default="adaptive_analytical", choices=["adaptive_analytical", "rmsprop"])
     parser.add_argument("--neutral-on-loss", action="store_true", help="手离开 1s 后回中立位")
     parser.add_argument("--visualize-landmarks", action="store_true")
+    parser.add_argument("--sim-out", default="sim_frames", help="--drive sim 时渲染帧存到哪")
+    parser.add_argument("--sim-every", type=int, default=8, help="--drive sim 时每 N 步存一帧")
     args = parser.parse_args(argv)
 
     for label, path in (("model", args.model), ("urdf", args.urdf), ("retarget-config", args.retarget_config)):
@@ -164,7 +223,11 @@ def main(argv: list[str] | None = None) -> int:
 
     from orca_teleop.pipeline import run
 
-    sink = JointSink(args.drive, Path(args.model), args.hz, args.neutral_on_loss)
+    if args.drive == "sim":
+        sink = build_sim_sink(Path(args.model), Path(args.sim_out), args.sim_every)
+        print(f"[live] sink=sim：orca_sim / MuJoCo，渲染帧写入 {Path(args.sim_out).resolve()}")
+    else:
+        sink = JointSink(args.drive, Path(args.model), args.hz, args.neutral_on_loss)
     print(f"[live] 监听 0.0.0.0:{args.port}（gRPC HandFrame）")
     print(f"[live] backend={args.backend}  model={Path(args.model).name}  urdf={Path(args.urdf).name}")
     print(f"[live] 另一侧请运行: orca_bridge.py --sink grpc   （默认推 localhost:50051）")
@@ -177,6 +240,11 @@ def main(argv: list[str] | None = None) -> int:
         retargeter_backend=args.backend,
         retargeter_config_path=args.retarget_config,
     )
+    if args.drive == "sim":
+        frames = getattr(sink, "frames", [])
+        print(f"[live] 共存下 {len(frames)} 帧渲染画面")
+        for item in frames[:3] + frames[-3:]:
+            print(f"      step={item['step']:<6} index_mcp={item['index_mcp']:6.1f}  {item['file']}")
     return 0
 
 
