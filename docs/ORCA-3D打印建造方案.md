@@ -91,8 +91,21 @@ PTFE 管在这版里是**功能性必需件**，不是可省的细节。
 | Dynamixel | **XC430-T240BB-T** | **XC330-T288-T** |
 | Feetech | **HLS3930** | **HLS3915** |
 
-两家族价差很大，**选型直接决定预算量级**。3MF 里盘 1（DYNAMIXEL）与盘 2（FEETECH）
-只是塔身不同，其余盘通用——所以**选型可以晚于打印决定**。
+两家族价差很大，**选型直接决定预算量级**。
+
+⚠️ **纠正一个容易踩的误解：选型必须在打印前定，不能晚于打印。**
+官方 README 说"盘 1 或盘 2 只是塔身不同"，但实际 STL 里**有 9 个零件是家族专属的**：
+
+| 家族专属零件 | Dynamixel | Feetech |
+|---|---|---|
+| 腕结构 `WristStructure_*` | ✅ **13.3 MB** | ✅ 13.3 MB |
+| 腕适配器 `WristAdapter_*` | ✅ | ✅ |
+| 前臂结构 `ForeArmStructure_*` | ✅ | ✅ |
+| 后壳 `HullBack*` | ✅ | ✅ |
+| 风扇罩 `FanCover_Feetech 15.20.33` | — | ✅ |
+
+**光 `WristStructure` 一个就是 13.3 MB 的 STL**（属于打印时间最长的件之一）。
+打错家族等于白扔十几个小时机器时间——**先定家族，再开打印**。
 
 Dynamixel 路线还需 **U2D2 + Power Hub Board（PHB）+ 12V 电源**
 （`orca_core/docs/.../setting-up-dynamixels.md` 逐字：Protocol 2.0、Baudrate 57600 与 3Mbps、
@@ -148,11 +161,38 @@ git clone https://github.com/orcahand/orcahand_hardware.git   # 约 850 MB
 | 04_ForeArm | 15 | 3.4 MB |
 | 05_Spools | 4 | 1.0 MB |
 | 09_Skin | 9 | 6.0 MB |
-| 07_Molds（模具，可选） | 38 | 40.9 MB |
+| **手部小计** | **60** | **88.4 MB** |
+| 07_Molds（模具，仅硅胶路线需要） | 38 | 40.9 MB |
 
-材料：结构件 PLA（强度够、尺寸稳）；皮肤两选一——
-**TPU 直打（快，3MF 已含 `(TPU)` 盘）** 或 **硅胶浇注（官方推荐：抓握更好、更耐久）**。
-硅胶路线要打印模具（`SiliconeMolds-1100.3mf`，其中一块用 ~85A 软 TPU）+ 硅胶 + 脱泡。
+> 60 个里有 **9 个是舵机家族专属**（见 §1③），**打印前必须先定家族**。
+
+### 这些零件长什么样
+
+下面这张对照图是我把 15 个代表性零件从仓库拉下来、用 MuJoCo 渲染器实拍的
+（脚本：[orca-link/render_parts.py](../orca-link/render_parts.py)）：
+
+![ORCA 打印件对照](../orca-link/docs/orca-print-parts.png)
+
+几个和装配直接相关的观察：
+
+- **`BaseSpool` / `WristTeeth` 是带齿的线轴**，腱绳就绕在上面——这也是"张力靠棘轮拧线轴"
+  的原因。`ASSEMBLY_ADDENDUM` 提到 **V1100 的线轴是 4 个螺钉孔**（V1000 是 5 个），看图时别认错
+- **`Ratchet` 是个薄片**，就是官方让你用来拧线轴的张紧工具，随件打印
+- **`CORE-R` 是镂空的腕骨核心**，32 条 PTFE 通道就在这类件上
+- **`WristStructure_*` 是体积最大的结构件**（13.3 MB STL），家族专属
+- **`SpoolHolder`（打印版）在 v2.1 已被金属件取代**——仓库里同时给了
+  `04_ForeArm/SpoolHolder.stl`（打印）与 `06_CNC/SpoolHolder_CNC.step`（机加工）
+
+### 材料分配
+
+| 材料 | 零件 |
+|---|---|
+| **PLA**（结构） | 手指、腕骨、腕、前臂、线轴等绝大部分 |
+| **TPU ~85A**（软） | `09_Skin/*`（9 个皮肤）+ `02_Carpals/L·R-Carpals_Skin_TPU`（2 个腕骨软皮） |
+| **硅胶 Dragon Skin 10 NV** | 替代上一条的皮肤（官方推荐：抓握更好、更耐久） |
+
+皮肤两选一：**TPU 直打（快，3MF 已含 `(TPU)` 盘）** 或 **硅胶浇注**。
+硅胶路线要额外打印模具（`SiliconeMolds-1100.3mf`，其中一块用 ~85A 软 TPU）+ 硅胶 + 脱泡。
 
 ---
 

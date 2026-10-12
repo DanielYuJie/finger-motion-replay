@@ -26,6 +26,7 @@ orca-link/proto_gen/
 orca-link/vendor/
 orca-link/sim_frames*/
 orca-link/live_anim/
+orca-link/docs/parts/
 orca-link/*.log
 
 # ===== 通用 =====
