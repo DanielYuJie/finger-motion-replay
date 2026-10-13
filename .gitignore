@@ -27,6 +27,8 @@ orca-link/vendor/
 orca-link/sim_frames*/
 orca-link/live_anim/
 orca-link/docs/parts/
+# 上游官方排盘工程（orcahand_hardware 下载，约 31MB，不入库）
+orca-link/prints/
 orca-link/*.log
 
 # ===== 通用 =====
