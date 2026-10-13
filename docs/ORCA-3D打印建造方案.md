@@ -111,6 +111,51 @@ Dynamixel 路线还需 **U2D2 + Power Hub Board（PHB）+ 12V 电源**
 （`orca_core/docs/.../setting-up-dynamixels.md` 逐字：Protocol 2.0、Baudrate 57600 与 3Mbps、
 ID 范围 0–17）。**电源电流规格官方未给**。
 
+#### 有更便宜的舵机替代吗？有三档，差别在"要不要写代码"
+
+| 档 | 方案 | 省多少 | 代价 |
+|---|---|---|---|
+| **一** | **Feetech HLS3915 / HLS3930**（官方支持） | 相对 Dynamixel 约省一半 | **零代码**：打盘 2 的塔身 + Feetech 专属件（见上表），`motor_type` 自动探测 |
+| 二 | Feetech **STS/SCS 系列**（如 STS3215，明显更便宜） | 再省一些 | **要写新的 `MotorClient`**，见下 |
+| 三 | N-B-Studio fork 的 **SCS-225/ST3215** 路线 | 同档二 | 仓库里已有半成品（`scs225_client.py` 339 行 + `dual_scs225_client.py` + `orcahand-scs225-right/config.yaml`），但**装不上也加载不了** |
+
+**档一就是答案**：这是唯一"官方支持、只改打印内容、不动代码"的降本路径。
+orca_core 的型号映射里本来就写着 `HLS3930`（腕）/ `HLS3915`（指），
+`motor_type` 也是连接时自动探测的，所以换家族只是换一套 STL。
+
+**档二/档三为什么难**——orca_core 的 Feetech 支持是**硬绑 HLS 寄存器表**的：
+
+- `feetech_client.py` 只 `from .feetech_registers import HLS`，全部地址走 `HLS.*`；
+  型号映射只有 `4106: HLS3930`、`6922/5130: HLS3915`
+- 它用的 `HLSPacketHandler` 注释写的是 "**little-endian registers, no family helpers**"
+  ——即 HLS 是**小端**；而 Feetech 经典 STS/SCS 协议是**大端**，所以**不能只改配置就接上**
+- 好消息：vendored SDK 里**已经带了** `scscl.py`（SCS 系列）与 `sms_sts.py`（STS 系列），
+  也就是"能通信"，缺的是上层客户端的寄存器映射与包处理器
+
+我实测确认了 fork 那条路是断的：
+`OrcaHandConfig.from_config_path(".../orcahand-scs225-right/config.yaml")`
+→ `HandConfigValidationError: Unknown motor_type: 'scs225'`，
+因为 fork 只加了两个 client 文件，**没动** `constants.py` 的 `SUPPORTED_MOTOR_TYPES`
+（仍是 `['dynamixel','feetech']`）也没动 `motor_factory.py`（grep 零 scs 引用），
+那两个 client 没有任何东西 import。
+
+**换便宜舵机时绝不能破坏的四件事**（这才是真正的成本）：
+
+1. **腕需要多圈位置模式**——`control_mode` 里专门为腕准备了 `multi_turn_position`；
+   不支持多圈的舵机做不了腕的收线与 60° 行程
+2. **硬限位自动标定**——ORCA 的招牌能力。它把每个关节驱到硬限位、靠**堵转/电流**判定，
+   所以 `calibration_current`、`MIN_MOTOR_TRAVEL_RAD`、`calibration_retry_current` 才有意义。
+   **便宜的、电流反馈不可靠的舵机做不了这个**，等于 17 个关节改手工标定
+3. **扭矩与张力**——代码注释写明 `HLS3915 fingers stall at 1.5 A`，
+   而整手要能四指抓 10.5 kg。扭矩不足会顶不住腱绳张力
+4. **总线一致性**——同一波特率菊花链、17 个唯一 ID，且 `motor_resolution` 靠 ping 厂商 ID
+   探测；新家族必须加进探测逻辑
+
+> 结论：**要省钱就走档一（Feetech HLS）**，改打印不改代码。
+> 再往下省的那点钱，要用"写并验证一个新的电机客户端 + 重调标定"来换，
+> 而且立刻失去硬限位自动标定——相对 17 个舵机的总价，这笔账通常不划算。
+> （论文给的对照也说明 ORCA 已在便宜档：Shadow >100,000 CHF、Allegro ≈15,000 CHF、LEAP <2,000 CHF。）
+
 ---
 
 ## 2. 变体选型
