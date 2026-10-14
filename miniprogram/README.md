@@ -63,9 +63,10 @@
 | [`core/hand.js`](core/hand.js) | 21 点定义、关节角解算、坐标归一化 | ✅ **Node 量化验证** |
 | [`core/stability.js`](core/stability.js) | One-Euro、显示滞回、出现/离开判定 | ✅ **Node 量化验证** |
 | [`app.json`](app.json) / [`app.js`](app.js) / [`app.wxss`](app.wxss) | 全局配置、基础库检查、设计令牌 | ⚠️ 仅语法 / JSON 校验 |
-| [`pages/capture/`](pages/capture/) | 页面：VKSession + canvas + 仪表 UI | ⚠️ 逻辑已用桩件集成测试，真机未验证 |
-| [`test/verify.js`](test/verify.js) | 自检脚本（纯 Node，43 项断言） | ✅ **43/43 通过** |
-| [`project.config.json`](project.config.json) | appid 占位 | ⚠️ 需你填写 |
+| [`pages/capture/`](pages/capture/) | 页面：VKSession + WebGL 画面/骨架 + 仪表 UI | ✅ 会话与相机已在真机跑通；⚠️ 新 GL 渲染路径待真机确认 |
+| [`core/glview.js`](core/glview.js) | WebGL 渲染层：YUV 相机预览 + 骨架（照官方 `yuvBehavior.js`） | ⚠️ 接线已测，真机渲染待确认 |
+| [`test/verify.js`](test/verify.js) | 自检脚本（纯 Node，51 项断言） | ✅ **51/51 通过** |
+| [`project.config.json`](project.config.json) | appid 与编译配置 | ✅ 已填 |
 
 ### 核心的量化验证结果
 
@@ -92,12 +93,14 @@
 node miniprogram/test/verify.js
 ```
 
-当前结果：**43/43 通过**（exit code 0）。它覆盖：
+当前结果：**51/51 通过**（exit code 0）。它覆盖：
 
 - **A 算法核心**：抖动抑制、精度、显示滞回、`PresenceGate` 九种时序、坐标归一化、关节角契约
 - **B 页面逻辑**：用桩件加载**真实的** `pages/capture/index.js`，跑通
-  生命周期 → `VKSession` 接线（含 `mode:1`）→ `updateAnchors` → 稳定链路 → `setData` 载荷，
-  以及 WXML 绑定的事件/字段与页面是否对得上、关闭时是否释放会话、canvas 缺失时是否容错
+  生命周期 → `VKSession` 接线（含 `mode:1`、`version:'v1'`、`gl`）→ `updateAnchors`
+  → 稳定链路 → `setData` 载荷，以及 WXML 绑定的事件/字段是否对得上、
+  **`<camera>` 组件是否被误加回来**、`start` 后是否真的启动了帧循环、
+  关闭时是否释放会话、canvas 缺失时是否容错
 
 改完 `minCutoff` / `beta` 等参数后跑一遍，就能立刻看到抖动抑制比例有没有变差。
 
@@ -105,37 +108,87 @@ node miniprogram/test/verify.js
 > `minCutoff`，平滑会明显变弱 —— 所以这里把 `minCutoff` 从 1.5/1.2 调到 **1.1/0.9**，
 > 上表就是在 30fps 下调好参数后的结果。
 
-### 必须坦白的一点
+### 真机验证状态（已不是纸面推断）
 
-**本机没有安装微信开发者工具，也没有小程序 AppID，所以页面层我没能真正跑起来。**
-`core/` 是平台无关的，我做了上面的量化验证；`pages/` 也用桩件加载真实页面模块做了
-43 项集成测试（生命周期、会话接线、防闪烁、载荷结构、释放、容错）。
-但**真机专属的部分——canvas 节点 API、camera 组件、VisionKit 的坐标口径——未经任何验证**。
-第一次在开发者工具里打开时请按下一节逐条确认。
+这个页面**已经在真机 iPhone 上跑过了**，第一轮的结果是：`session.start` 返回成功、
+相机画面正常，但 **`updateAnchors` 一次都没触发** —— 状态显示「采集中 · 识别中」，
+而帧率与角度读数恒为 `—`。
+
+根因是**架构层面的，不是算法**。对着官方实时示例源码（
+[`miniprogram-demo/packageAPI/pages/ar/hand-detect`](https://github.com/wechat-miniprogram/miniprogram-demo/tree/master/miniprogram/packageAPI/pages/ar/hand-detect)）
+逐行核对后确认有三处：
+
+| # | 问题 | 依据 |
+|---|---|---|
+| 1 | **从不调用 `session.getVKFrame()`** | 官方文档原话：`getVKFrame`「每调用一次都会触发一次**帧分析过程**」。帧分析由它驱动 —— 不调用就永远没有 anchor，而 `start` 依然是成功的。这是「零回调」的直接原因 |
+| 2 | 用了 `<camera>` 组件做预览 | 官方**所有**实时示例的 WXML 里 `<camera>` 标签数为 **0**，画面一律来自 `session.getVKFrame()`；实时模式下摄像头由 VKSession 自己持有 |
+| 3 | 把 `points` 当成像素处理 | 官方示例的换算 `x * 2 - 1, 1 - y * 2` 是「0..1 → NDC」，只有 `x,y ∈ [0,1]` 才成立 → **`points` 是 0–1 归一化坐标** |
+
+现已按官方架构重写：`createVKSession({ track:{hand:{mode:1}}, version:'v1', gl })`
+→ `session.requestAnimationFrame` 帧循环 → `getVKFrame()` → `frame.getCameraTexture(gl,'yuv')`
+经 YUV 着色器上屏（见 [`core/glview.js`](core/glview.js)），骨架也画在同一块 WebGL 画布内
+（native canvas 互相叠加不保证合成，官方同样用 GL 画点）。
+
+**仍未验证的部分**：这条新的 WebGL 渲染路径**没在真机上跑过**。静态测试只能保证接线正确
+（51/51 通过，含 `WXML 不含 <camera>`、`start 后启动了帧循环` 两条回归防线），
+不能保证真机渲染结果。
 
 ---
 
-## 首次运行要确认的 4 件事
+## 重跑时看这三个读数
 
-这四处是我在无法真机验证的情况下必须做的假设，都集中在
-[`pages/capture/index.js`](pages/capture/index.js) 顶部，改起来都是一行：
+仪器条上的字段是刻意按排障顺序排的，**从上到下逐级排除**：
 
-1. **`POINTS_ARE_PIXELS`**（默认 `true`）
-   官方文档写 `points` 是「人手 2D 关键点在**图像中的** (x,y) 坐标」，即像素。
-   若骨架整体缩成一小团或跑到角落，说明返回的其实已是 0–1 归一化 → 改成 `false`。
+| 读数 | 有数字说明什么 | 恒为 `—` 说明什么 |
+|---|---|---|
+| **画面帧**（`getVKFrame` 取到帧的次数） | 相机帧链路通了 | 相机没出帧 → 与算法无关，查会话/权限 |
+| **帧率**（`updateAnchors` 触发频率） | 帧分析在跑 | 帧分析没跑 → 检查基础库 ≥ 2.28.0 |
+| **关键点** | 检测到手、载荷正常 | 有帧但没识别到手 → 把手放进画面中央、光照充足 |
 
-2. **`FRAME`**（默认 `720 × 1280`）
-   归一化与「cover」映射都需要检测帧尺寸。骨架整体偏移/缩放不对就调这两个值。
-   手机竖屏前置摄像头常见 720×1280 或 480×640。
+如果显示「出错了」，提示区会给出**中文原因**，例如：
 
-3. **`SHOW_CAMERA_PREVIEW`**（默认 `true`）
-   VisionKit 只负责检测、不负责画画面，所以通常要用 `<camera>` 组件预览。
-   但两者同时占用摄像头在个别机型上可能冲突 —— 若 `session.start` 的 errno
-   指向摄像头被占用，改成 `false` 试试。
+- `112 相机未在「小程序隐私协议」里声明` —— 新小程序最常见的坑，去小程序后台补「摄像头」用途声明
+- `2003001 未开启系统相机权限` —— 去系统设置里给微信开相机
+- `2000002 设备不支持 VisionKit`
 
-4. **镜像**
-   前置摄像头预览是镜像的，骨架覆盖层必须跟着镜像，否则左右反。
-   代码里按 `mirror` 开关做了映射；若发现骨架与手反着走，就是这里的映射要调。
+## 首次运行要确认的事
+
+1. **基础库 ≥ 2.28.0**（`hand` track 的最低要求）。`app.js` 会在低于此版本时弹窗提示；
+   模拟器实测为 3.17.4，正常不会触发。
+2. **镜像方向**。前置摄像头预览的镜像由 `getDisplayTransform()` 负责，而关键点是按
+   归一化坐标直接映射的，**官方示例不对点做镜像**，所以这里 `mirror` 默认为 `false`。
+   若骨架与手左右反着走，打开「镜像显示」开关即可。
+3. **`VKSession` 是单例、页面间运行周期互斥**。如果你在这一页之前用过它（或热重载残留），
+   请**退出重进页面**再点开始；`onUnload` / `onHide` 里已做 `destroy()`。
+
+---
+
+## iOS 真机验证清单（iPhone）
+
+小程序天然跨 iOS/Android，iPhone 上这几处要真机确认：
+
+| # | 验证项 | 现象 → 处理 |
+|---|---|---|
+| 1 | **相机画面是否正常上屏** | 全黑/花屏 → 查「画面帧」是否恒为 `—`；有帧但画面异常则是 YUV 着色器或 `getDisplayTransform()` 取向问题 |
+| 2 | **骨架是否与手对齐** | 左右反 → 打开「镜像显示」；整体偏移/缩放不对 → 归一化映射问题（归一化点 × 画布尺寸，无 cover 换算） |
+| 3 | **帧率是否够用** | 旧机型低于 15fps → 可把帧循环限到 30fps 以内（`getVKFrame` 推荐 ≤ 30fps） |
+| 4 | **是否有残留会话** | 报 `2003000 会话不可用` → 退出重进页面 |
+
+另外两点是 iOS 特有但已静态处理好的：
+
+- **底部安全区**：index.wxss 已加 `env(safe-area-inset-bottom)`（带 `constant()` 兜底），
+  iPhone 全面屏底部按钮不会被 Home Indicator 遮挡
+- **基础库检查**：`app.js` 会弹窗提示基础库 < 2.28.0
+
+iPhone 性能预期：VisionKit 为系统能力、推理开销低，帧率主要受 WebGL 绘制与 `setData`
+节流影响，旧机型约 15–30fps。
+
+### iPhone 真机预览
+
+开发者工具打开本项目 → 点工具栏「预览」→ 生成二维码 → iPhone 用微信扫码即可（个人开发者账号 / 测试号均可）。首次授权摄像头时微信会弹系统级权限，允许后进入采集页。
+
+> 排障建议用**「真机调试」**而不是「预览」：真机调试能把手机端的 `console` 回传到工具的
+> 调试器里，`session.start` 的 errno 与逐帧日志都能直接看到。
 
 ---
 

@@ -19,17 +19,13 @@
   <!-- 取景区 -->
   <view class="frame">
     <view class="viewport">
-      <camera
-        wx:if="{{running && showCameraPreview}}"
-        class="cam"
-        device-position="front"
-        resolution="medium"
-        flash="off"
-        frame-size="medium"
-        bindstop="onCameraStop" />
-
-      <!-- 骨架覆盖层 -->
-      <canvas type="2d" id="overlay" class="overlay"></canvas>
+      <!--
+        相机画面由 VKSession 产出，必须画在 WebGL canvas 里：
+        session.getVKFrame() → frame.getCameraTexture(gl, 'yuv') → YUV 着色器。
+        这里不能放 <camera> 组件 —— 它会独占摄像头，导致 VKSession 收不到帧。
+        骨架也画在这一块 GL canvas 里（见 core/glview.js）。
+      -->
+      <canvas type="webgl" id="gfx" class="cam"></canvas>
 
       <view class="vf-corners">
         <view class="c c1"></view><view class="c c2"></view>
@@ -50,7 +46,7 @@
         <text class="k">帧率</text><text class="v mono">{{fps}}</text>
       </view>
       <view class="instrument">
-        <text class="k">推理</text><text class="v mono">{{inferMs}}</text>
+        <text class="k">画面帧</text><text class="v mono">{{frameCount}}</text>
       </view>
       <view class="instrument">
         <text class="k">关键点</text><text class="v mono">{{pointCount}}</text>

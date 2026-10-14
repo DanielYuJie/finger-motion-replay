@@ -32,6 +32,8 @@ orca-link/prints/
 orca-link/*.log
 
 # ===== 通用 =====
+# 微信开发者工具的个人配置（含本机编译设置，按官方约定不入库）
+miniprogram/project.private.config.json
 node_modules/
 __pycache__/
 *.pyc

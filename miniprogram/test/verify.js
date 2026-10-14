@@ -161,13 +161,71 @@ Date.now = function () { return NOW; };
 
 global.Page = function (o) { pageDef = o; };
 global.getApp = function () { return { globalData: { sdkVersion: '2.30.0' } }; };
+/* WebGL 上下文替身：只求「调用不炸 + 能断言画了什么」，不模拟真实渲染 */
+function mockGl() {
+  var gl = {
+    VERTEX_SHADER: 1, FRAGMENT_SHADER: 2, COMPILE_STATUS: 3, LINK_STATUS: 4,
+    ARRAY_BUFFER: 5, STATIC_DRAW: 6, DYNAMIC_DRAW: 7, FLOAT: 8,
+    DEPTH_TEST: 9, BLEND: 10, SRC_ALPHA: 11, ONE_MINUS_SRC_ALPHA: 12,
+    COLOR_BUFFER_BIT: 13, TEXTURE_2D: 14, TEXTURE0: 15, UNPACK_ALIGNMENT: 16,
+    TRIANGLE_STRIP: 17, LINES: 18, POINTS: 19, CURRENT_PROGRAM: 20,
+    ACTIVE_TEXTURE: 21, VERTEX_ARRAY_BINDING: 22,
+    calls: {}, draws: 0, drawModes: []
+  };
+  ['shaderSource', 'compileShader', 'attachShader', 'linkProgram', 'deleteShader',
+    'useProgram', 'uniform1i', 'uniform1f', 'uniformMatrix3fv', 'bindBuffer',
+    'bufferData', 'disable', 'enable', 'blendFunc', 'clearColor', 'clear',
+    'pixelStorei', 'activeTexture', 'bindTexture', 'vertexAttribPointer',
+    'enableVertexAttribArray', 'deleteProgram', 'deleteBuffer', 'viewport'
+  ].forEach(function (m) {
+    gl[m] = function () { gl.calls[m] = (gl.calls[m] || 0) + 1; };
+  });
+  gl.createShader = function () { return {}; };
+  gl.createProgram = function () { return {}; };
+  gl.createBuffer = function () { return {}; };
+  gl.getShaderParameter = function () { return true; };
+  gl.getProgramParameter = function () { return true; };
+  gl.getShaderInfoLog = function () { return ''; };
+  gl.getProgramInfoLog = function () { return ''; };
+  gl.getAttribLocation = function () { return 0; };
+  gl.getUniformLocation = function () { return {}; };
+  gl.getParameter = function () { return null; };
+  gl.drawArrays = function (mode) { gl.draws++; gl.drawModes.push(mode); };
+  return gl;
+}
+
+function mockCtx2d() {
+  var c = { calls: {} };
+  ['clearRect', 'beginPath', 'arc', 'stroke', 'fill', 'moveTo', 'lineTo'].forEach(function (m) {
+    c[m] = function () { c.calls[m] = (c.calls[m] || 0) + 1; };
+  });
+  return c;
+}
+
+function mockCanvasNode() {
+  var gl = mockGl();
+  var ctx = mockCtx2d();
+  return {
+    width: 0, height: 0, gl: gl, ctx: ctx,
+    getContext: function (t) { return t === 'webgl' ? gl : ctx; }
+  };
+}
+
+var canvasNodes = [mockCanvasNode(), mockCanvasNode()];
+var rafCalls = 0;
+var pendingFrames = [];   // 帧回调交给测试手动驱动：mock 里真去循环会死循环
+
 global.wx = {
   getWindowInfo: function () { return { pixelRatio: 2 }; },
   createSelectorQuery: function () {
     var q = {
       select: function () { return q; },
       fields: function () { return q; },
-      exec: function (cb) { cb([{ node: null, size: null }, { node: null, size: null }]); }
+      exec: function (cb) {
+        cb(canvasNodes.map(function (n) {
+          return { node: n, width: 320, height: 240 };
+        }));
+      }
     };
     return q;
   },
@@ -178,9 +236,12 @@ global.wx = {
     var handlers = {};
     sessionObj = {
       opts: opts, handlers: handlers, started: false, destroyed: false,
+      frameCalls: 0, rafCalls: 0,
       on: function (e, cb) { handlers[e] = cb; },
       start: function (cb) { this.started = true; cb(null); },
-      destroy: function () { this.destroyed = true; }
+      destroy: function () { this.destroyed = true; },
+      getVKFrame: function () { this.frameCalls++; return null; },
+      requestAnimationFrame: function (cb) { this.rafCalls++; rafCalls++; pendingFrames.push(cb); }
     };
     return sessionObj;
   }
@@ -196,6 +257,14 @@ function makeInstance(def) {
 }
 function pixelHand() {
   return pose('straight').map(function (p) { return { x: p.x * 720, y: p.y * 1280, z: 0 }; });
+}
+/**
+ * VisionKit 的 points 是 0–1 归一化（不是像素）。
+ * 依据：官方 hand-detect 示例把点直接转 NDC —— flattenPoints.push(x * 2 - 1, 1 - y * 2)，
+ * 该式仅在 x,y ∈ [0,1] 时成立。页面的 POINTS_ARE_PIXELS 因此为 false。
+ */
+function normHand() {
+  return pose('straight').map(function (p) { return { x: p.x, y: p.y }; });
 }
 
 (function () {
@@ -217,6 +286,13 @@ function pixelHand() {
   var card0 = pageDef.data.angleCards[0];
   var missingC = itemFields.filter(function (f) { return !(f in card0); });
   check('angleCards 提供 WXML 用到的字段', missingC.length === 0, missingC.join(', ') || Object.keys(card0).join(','));
+
+  // 回归防线：真机上曾因 <camera> 组件抢占摄像头，导致 VKSession start 成功却零回调。
+  // 官方所有实时 demo 的 WXML 里都没有 camera 组件，画面一律来自 session.getVKFrame。
+  // 注意先剥掉注释 —— 注释里会提到 camera 这个词，不该算命中。
+  var wxmlTags = wxml.replace(/<!--[\s\S]*?-->/g, '');
+  check('WXML 不含 <camera> 组件（它会让 VKSession 收不到帧）', !/<camera[\s/>]/.test(wxmlTags));
+  check('WXML 含 WebGL 画布 #gfx', /<canvas[^>]*type\s*=\s*"webgl"/.test(wxmlTags) && /id\s*=\s*"gfx"/.test(wxmlTags));
 })();
 
 section('=== B2. 生命周期与 VKSession 接线 ===');
@@ -224,17 +300,28 @@ var inst = makeInstance(pageDef);
 (function () {
   inst.onLoad();
   check('onLoad 建立稳定链路', !!(inst.lm && inst.ang && inst.disp && inst.gate));
+
+  // 必须先建好 WebGL 画布：gl 要交给 VKSession，相机画面也是画在这块画布上
+  inst.onReady();
+  check('onReady 建好 WebGL 渲染层', !!(inst.glv && inst.glv.ok), (inst.glv && inst.glv.error) || '');
+  check('GL canvas 按 pixelRatio 设了尺寸',
+    canvasNodes[0].width === 640 && canvasNodes[0].height === 480,
+    canvasNodes[0].width + 'x' + canvasNodes[0].height);
+
   inst.onStart();
   check('VKSession 使用 mode:1（摄像头实时）', sessionObj && sessionObj.opts.track.hand.mode === 1);
+  check('VKSession 传入 version:v1 与 gl', !!sessionObj && sessionObj.opts.version === 'v1' && !!sessionObj.opts.gl);
   check('session.start 被调用', sessionObj && sessionObj.started);
   check('注册了 updateAnchors / removeAnchors',
     typeof sessionObj.handlers.updateAnchors === 'function' && typeof sessionObj.handlers.removeAnchors === 'function');
   check('running=true 且状态 live', inst.data.running === true && inst.data.statusState === 'live');
+  // 帧分析是被 getVKFrame 驱动的：不跑帧循环就永远不会有 anchor（真机踩过的坑）
+  check('start 后启动了帧循环', rafCalls > 0, 'rafCalls=' + rafCalls);
 })();
 
 section('=== B3. 检测到手的输出载荷 ===');
 (function () {
-  sessionObj.handlers.updateAnchors([{ points: pixelHand() }]);
+  sessionObj.handlers.updateAnchors([{ points: normHand() }]);
   var d = inst.data;
   check('angleCards 为 5 根手指 × 3 关节',
     d.angleCards.length === 5 && d.angleCards.every(function (c) { return c.joints.length === 3; }));
@@ -265,7 +352,7 @@ section('=== B4. 漏检宽限（防闪烁） ===');
 section('=== B5. 重新出现能恢复 ===');
 (function () {
   NOW += 900;
-  sessionObj.handlers.updateAnchors([{ points: pixelHand() }]);
+  sessionObj.handlers.updateAnchors([{ points: normHand() }]);
   check('读数恢复', /^\d+\.\d$/.test(inst.data.focusFlex), 'flex=' + inst.data.focusFlex);
 })();
 
@@ -277,16 +364,33 @@ section('=== B6. 关闭与释放 ===');
   check('释放了 session 引用', inst.session === null);
 })();
 
-section('=== B7. canvas 不可用时的容错 ===');
+section('=== B7. 画布 / WebGL 不可用时的容错 ===');
 (function () {
-  var threw = null;
+  // 让节点查询返回空，模拟取不到 canvas（例如节点还没创建就被点了开始）
+  var realQuery = wx.createSelectorQuery;
+  var threw = null, tips = null, status = null;
   try {
+    wx.createSelectorQuery = function () {
+      var q = {
+        select: function () { return q; },
+        fields: function () { return q; },
+        exec: function (cb) { cb([]); }
+      };
+      return q;
+    };
     var i2 = makeInstance(pageDef);
     i2.onLoad();
-    i2.drawOverlay([{ x: 0.5, y: 0.5 }]);
-    i2.drawGauge(50);
+    i2.onReady();          // 取不到画布 → 应写入提示，而不是抛异常
+    tips = i2.data.tips;
+    i2.drawGauge(50);      // 没有 gaugeCtx → 直接返回
+    i2.onStart();          // 没有 GL → 应走 fail 分支并说明原因
+    status = i2.data.status;
   } catch (e) { threw = e; }
-  check('drawOverlay / drawGauge 不抛异常', threw === null, threw ? threw.message : '');
+  wx.createSelectorQuery = realQuery;
+
+  check('取不到画布时不抛异常', threw === null, threw ? threw.message : '');
+  check('取不到画布时给出提示', Array.isArray(tips) && tips.length > 0, (tips && tips[0]) || '');
+  check('无 GL 时点开始会明确报错而非静默', status === '出错了', 'status=' + status);
 })();
 
 Date.now = realNow;

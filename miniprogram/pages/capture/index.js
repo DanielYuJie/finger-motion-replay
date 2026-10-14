@@ -1,36 +1,36 @@
 /**
  * pages/capture/index.js — 视觉主端（小程序版）
  *
- * 与网页端的分工完全一致：
- *   微信 VisionKit 人手检测（本机、免费、21 点）→ 关节角 → 3 级稳定链路 → 画面/读数
- * 算法核心来自 ../../core，与浏览器端是同一套，已在 Node 里量化验证过。
+ * 分工与网页端一致：
+ *   微信 VisionKit 人手检测（本机、21 点）→ 关节角 → 3 级稳定链路 → 画面/读数
+ *   算法核心来自 ../../core，与浏览器端同一套，已在 Node 里量化验证过。
  *
  * ────────────────────────────────────────────────────────────────
- * ⚠️ 首次真机调试必须确认的两件事（我无法在此环境验证）
+ * 真机踩过的两个坑（都已按官方示例改掉，勿回退）
  *
- *  1) POINTS_ARE_PIXELS
- *     文档写 VisionKit 的 points 是「图像中的 (x,y) 坐标」，即像素。
- *     若你的基础库返回的其实已是 0–1 归一化，把这里改成 false 即可。
+ *  1) 不能用 <camera> 组件做预览。
+ *     官方「通过摄像头实时检测」示例（miniprogram-demo/packageAPI/pages/ar/hand-detect）
+ *     的 WXML 里没有 camera 组件，只有一块 <canvas type="webgl">。
+ *     实时模式下摄像头画面由 VKSession 自己产出，必须：
+ *        wx.createVKSession({ track:{hand:{mode:1}}, version:'v1', gl })
+ *        const frame = session.getVKFrame(w, h)
+ *        const { yTexture, uvTexture } = frame.getCameraTexture(gl, 'yuv')
+ *     用 <camera> 的后果：它独占摄像头，session.start 返回 0（成功），
+ *     但 updateAnchors 永不触发 —— 表现为「状态采集中、有画面、零回调」。
  *
- *  2) FRAME
- *     归一化与「cover」映射都需要知道检测帧的尺寸。
- *     若真机上骨架整体偏移/缩放不对，就调这两个值（常见为 720×1280 或 480×640）。
+ *  2) anchor.points 是 **0–1 归一化**坐标，不是像素。
+ *     官方示例的换算 x*2-1 / 1-y*2 正是 0..1→NDC。所以 POINTS_ARE_PIXELS=false。
+ *     又因 getVKFrame(canvas.width, canvas.height) 按画布取帧，
+ *     归一化点 × 画布尺寸 即为画布像素位置，无需 cover/letterbox 换算。
  * ────────────────────────────────────────────────────────────────
  */
 
 var handCore = require('../../core/hand.js');
 var stab = require('../../core/stability.js');
+var glview = require('../../core/glview.js');
 
-var POINTS_ARE_PIXELS = true;
-var FRAME = { w: 720, h: 1280 };
-
-/**
- * 是否用 <camera> 组件渲染预览。
- * VisionKit 只负责「检测」，不负责画画面，所以通常需要 camera 组件做预览。
- * 但两者同时占用摄像头在个别机型上可能冲突；若 session.start 返回的 errno
- * 指向摄像头被占用，把这个开关改成 false，只保留骨架覆盖层试试。
- */
-var SHOW_CAMERA_PREVIEW = true;
+// 见上文坑 2：VisionKit 的 points 已是 0–1 归一化
+var POINTS_ARE_PIXELS = false;
 
 var FINGER_LABELS = ['全部', '食指', '中指', '无名指', '小指', '拇指'];
 var FINGER_KEYS = [null, 'index', 'middle', 'ring', 'pinky', 'thumb'];
@@ -49,18 +49,47 @@ function buildCards() {
   });
 }
 
+function windowInfo() {
+  try {
+    if (typeof wx.getWindowInfo === 'function') return wx.getWindowInfo();
+  } catch (e) { /* 回退 */ }
+  try { return wx.getSystemInfoSync(); } catch (e) { return {}; }
+}
+
+/**
+ * `session.start` 的 errno 文案（取自官方 VKSession.start 状态表与公共错误码）。
+ * 保留原始码便于对照文档 —— 这几个码的成因差别很大，只报数字等于没报。
+ */
+var VK_ERRNO = {
+  104: '用户取消了授权',
+  112: '相机未在「小程序隐私协议」里声明 —— 去小程序后台补「摄像头」用途声明并重新发布',
+  1025: '小程序隐私接口被封禁',
+  1026: '小游戏隐私接口被封禁',
+  2000000: '系统错误',
+  2000001: '参数错误',
+  2000002: '设备不支持 VisionKit',
+  2000003: '系统不支持 VisionKit',
+  2000004: '设备不支持 VisionKit',
+  2003000: '会话不可用（页面上可能还有未销毁的 VKSession，退出重进页面再试）',
+  2003001: '未开启系统相机权限 —— 去系统设置里给微信开相机',
+  2003002: '未开启小程序相机权限'
+};
+
+function errnoText(e) {
+  return (VK_ERRNO[e] || '未知原因') + '（errno=' + e + '）';
+}
+
 Page({
   data: {
     running: false,
     status: '未开启',
     statusState: 'idle',
     handVisible: false,
-    showCameraPreview: SHOW_CAMERA_PREVIEW,
     fps: '—',
-    inferMs: '—',
+    frameCount: '—',
     pointCount: '—',
     sdkVersion: '—',
-    mirror: true,
+    mirror: false,          // 官方示例不对点做镜像；如画面感觉左右反了，打开这个开关
     showAngles: true,
     fingerLabels: FINGER_LABELS,
     fingerIndex: 0,
@@ -72,122 +101,79 @@ Page({
   /* ---------------- 生命周期 ---------------- */
 
   onLoad: function () {
-    // 稳定链路：和平板/浏览器端同一套参数（已按 15–30fps 重新调过）
     this.lm = new stab.LandmarkSmoother();
     this.ang = new stab.AngleSmoother();
     this.disp = new stab.DisplayHysteresis(0.4);
     this.gate = new stab.PresenceGate({ graceMs: 250, reacquireMs: 700 });
 
     this.session = null;
-    this.overlayCtx = null;
+    this.glv = null;
     this.gaugeCtx = null;
 
+    this._running = false;
     this._frames = 0;
     this._fpsAt = 0;
     this._lastPush = 0;
+    this._gfxFrames = 0;      // getVKFrame 成功取到画面的帧数
+    this._gfxNull = 0;        // getVKFrame 返回 null 的次数
+    this._lastGfxPush = 0;
     this._handVisible = false;
     this._fps = 0;
 
     var app = getApp();
     this.setData({ sdkVersion: (app && app.globalData && app.globalData.sdkVersion) || '—' });
+  },
 
+  // 节点查询必须在 onReady 之后做，否则拿不到 canvas node
+  onReady: function () {
     this.initCanvases();
   },
 
-  onUnload: function () {
-    this.stopSession();
-  },
-
-  onHide: function () {
-    // 页面不可见时释放摄像头，避免占用
-    this.stopSession();
-  },
+  onUnload: function () { this.stopSession(); },
+  onHide: function () { this.stopSession(); },
 
   /* ---------------- canvas ---------------- */
 
   initCanvases: function () {
     var self = this;
     var q = wx.createSelectorQuery();
-    q.select('#overlay').fields({ node: true, size: true });
+    q.select('#gfx').fields({ node: true, size: true });
     q.select('#gauge').fields({ node: true, size: true });
     q.exec(function (res) {
-      var dpr = 1;
-      try { dpr = wx.getWindowInfo().pixelRatio || 1; } catch (e) { dpr = 1; }
+      var info = windowInfo();
+      var dpr = info.pixelRatio || 1;
 
-      if (res[0] && res[0].node) {
-        var c = res[0].node;
-        c.width = res[0].width * dpr;
-        c.height = res[0].height * dpr;
-        self.overlayCanvas = c;
-        self.overlayCtx = c.getContext('2d');
-        self.overlayDpr = dpr;
+      // ---- WebGL 画布：相机预览 + 骨架 ----
+      var g = res && res[0];
+      if (!g || !g.node) {
+        self.setData({ tips: ['取不到 #gfx 画布节点，无法创建 WebGL 上下文'] });
+        return;
       }
-      if (res[1] && res[1].node) {
-        var g = res[1].node;
-        g.width = res[1].width * dpr;
-        g.height = res[1].height * dpr;
-        self.gaugeCanvas = g;
-        self.gaugeCtx = g.getContext('2d');
+      var gc = g.node;
+      gc.width = Math.max(1, Math.round(g.width * dpr));
+      gc.height = Math.max(1, Math.round(g.height * dpr));
+
+      var view = new glview.GLView(gc);
+      view.dpr = dpr;
+      if (!view.init()) {
+        // 如实把 GL 失败原因显示出来，而不是静默黑屏
+        self.setData({ tips: ['WebGL 初始化失败：' + view.error] });
+        return;
+      }
+      self.glv = view;
+
+      // ---- 2D 画布：仪表盘（与 GL 画布不重叠，无叠层问题）----
+      var gg = res && res[1];
+      if (gg && gg.node) {
+        var ggc = gg.node;
+        ggc.width = Math.max(1, Math.round(gg.width * dpr));
+        ggc.height = Math.max(1, Math.round(gg.height * dpr));
+        self.gaugeCanvas = ggc;
+        self.gaugeCtx = ggc.getContext('2d');
         self.gaugeDpr = dpr;
         self.drawGauge(0);
       }
     });
-  },
-
-  /**
-   * 把检测帧坐标映射到画布（cover：铺满并裁切，避免拉伸变形）。
-   * mirror 与 camera 的镜像预览保持一致，否则骨架会左右反。
-   */
-  makeMapper: function () {
-    var c = this.overlayCanvas;
-    if (!c) return null;
-    var w = c.width, h = c.height;
-    var scale = Math.max(w / FRAME.w, h / FRAME.h);
-    var dw = FRAME.w * scale, dh = FRAME.h * scale;
-    var dx = (w - dw) / 2, dy = (h - dh) / 2;
-    var mirror = this.data.mirror;
-    return function (p) {
-      var px = mirror ? (1 - p.x) : p.x;
-      return { x: dx + px * dw, y: dy + p.y * dh };
-    };
-  },
-
-  drawOverlay: function (pts) {
-    var ctx = this.overlayCtx;
-    if (!ctx || !this.overlayCanvas) return;
-    var c = this.overlayCanvas;
-    ctx.clearRect(0, 0, c.width, c.height);
-    if (!pts) return;
-
-    var map = this.makeMapper();
-    var dpr = this.overlayDpr || 1;
-
-    // 骨架连线
-    ctx.lineWidth = 3 * dpr;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = 'rgba(62, 207, 142, 0.9)';
-    var conns = handCore.HAND_CONNECTIONS;
-    for (var k = 0; k < conns.length; k++) {
-      var a = pts[conns[k][0]], b = pts[conns[k][1]];
-      if (!a || !b) continue;
-      var pa = map(a), pb = map(b);
-      ctx.beginPath();
-      ctx.moveTo(pa.x, pa.y);
-      ctx.lineTo(pb.x, pb.y);
-      ctx.stroke();
-    }
-
-    // 关节点
-    var focusKey = FINGER_KEYS[this.data.fingerIndex];
-    for (var i = 0; i < pts.length; i++) {
-      var p = map(pts[i]);
-      var isTip = focusKey && handCore.FINGER_DEFS[focusKey].ids[3] === i;
-      ctx.beginPath();
-      ctx.fillStyle = isTip ? '#f0b429' : '#5ad1ff';
-      ctx.arc(p.x, p.y, (isTip ? 7 : 4.5) * dpr, 0, Math.PI * 2);
-      ctx.fill();
-    }
   },
 
   drawGauge: function (pct) {
@@ -218,6 +204,10 @@ Page({
 
   onStart: function () {
     var self = this;
+    if (!this.glv || !this.glv.ok) {
+      this.fail('WebGL 未就绪' + (this.glv && this.glv.error ? '：' + this.glv.error : '（画布节点可能还未创建，稍等一秒再点）'));
+      return;
+    }
     wx.authorize({
       scope: 'scope.camera',
       success: function () { self.startSession(); },
@@ -235,11 +225,16 @@ Page({
   startSession: function () {
     if (this.session) return;
     var self = this;
-    this.setData({ status: '启动中…', statusState: 'loading' });
+    this.setData({ status: '启动中…', statusState: 'loading', tips: [] });
 
     var session;
     try {
-      session = wx.createVKSession({ track: { hand: { mode: 1 } } });
+      // 与官方一致：version + gl 都要给，VKSession 需要 gl 来产出相机纹理
+      session = wx.createVKSession({
+        track: { hand: { mode: 1 } },
+        version: 'v1',
+        gl: this.glv.gl
+      });
     } catch (e) {
       this.fail('createVKSession 失败：' + (e && e.message ? e.message : e) +
         '（VisionKit 需要基础库 2.28.0+）');
@@ -252,23 +247,74 @@ Page({
 
     session.start(function (errno) {
       if (errno) {
+        // 排障期务必留日志：errno 是唯一能区分「权限 / 隐私协议 / 机型不支持」的线索
+        console.error('[VK] session.start errno =', errno);
         self.session = null;
-        self.fail('session.start 失败，errno=' + errno +
-          '（若与摄像头占用有关，把 index.js 顶部的 SHOW_CAMERA_PREVIEW 改为 false 再试）');
+        self.fail('session.start 失败：' + errnoText(errno));
         return;
       }
-      self._fpsAt = Date.now();
+      self._running = true;
       self._frames = 0;
+      self._gfxFrames = 0;
+      self._gfxNull = 0;
+      self._fpsAt = 0;
       self.setData({
         running: true,
         status: '采集中 · 识别中',
         statusState: 'live',
         tips: []
       });
+      self.startRenderLoop();
+    });
+  },
+
+  /** 逐帧：取 VK 帧 → 画相机 + 骨架。官方示例用 session.requestAnimationFrame 驱动。 */
+  startRenderLoop: function () {
+    var self = this;
+    var session = this.session;
+    if (!session) return;
+    var raf = (typeof session.requestAnimationFrame === 'function')
+      ? function (cb) { session.requestAnimationFrame(cb); }
+      : function (cb) { self.glv.canvas.requestAnimationFrame(cb); };
+
+    var onFrame = function () {
+      if (!self._running || !self.session || !self.glv) return;
+
+      var frame = null;
+      try {
+        frame = session.getVKFrame(self.glv.canvas.width, self.glv.canvas.height);
+      } catch (e) {
+        frame = null;
+      }
+      if (frame) self._gfxFrames++; else self._gfxNull++;
+
+      try {
+        self.glv.render(frame, handCore.HAND_CONNECTIONS, self.data.mirror);
+      } catch (e) {
+        // 渲染异常不要每帧刷屏，停掉循环并报错
+        self._running = false;
+        self.fail('渲染异常：' + (e && e.message ? e.message : e));
+        return;
+      }
+
+      self.updateFrameReadout();
+      raf(onFrame);
+    };
+    raf(onFrame);
+  },
+
+  /** 「画面帧」读数：区分「相机没来帧」与「来了帧但没检测到手」，这是排障关键。 */
+  updateFrameReadout: function () {
+    var now = Date.now();
+    if (now - this._lastGfxPush < 500) return;
+    this._lastGfxPush = now;
+    this.setData({
+      frameCount: this._gfxFrames > 0 ? (this._gfxFrames + ' 帧') : ('0 帧(空' + this._gfxNull + ')')
     });
   },
 
   stopSession: function () {
+    this._running = false;
     if (this.session) {
       try { this.session.destroy(); } catch (e) { /* 忽略 */ }
       this.session = null;
@@ -277,16 +323,18 @@ Page({
     if (this.lm) this.lm.reset();
     if (this.ang) this.ang.reset();
     if (this.disp) this.disp.reset();
-    if (this.overlayCtx && this.overlayCanvas) {
-      this.overlayCtx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
-    }
+    if (this.glv) this.glv.setPoints(null, -1);
+
+    this._gfxFrames = 0;
+    this._gfxNull = 0;
+
     this.setData({
       running: false,
       status: '未开启',
       statusState: 'idle',
       handVisible: false,
       fps: '—',
-      inferMs: '—',
+      frameCount: '—',
       pointCount: '—',
       focusFlex: '—',
       angleCards: buildCards()
@@ -296,12 +344,8 @@ Page({
 
   onStop: function () { this.stopSession(); },
 
-  onCameraStop: function () {
-    // 用户拒绝或摄像头被占用
-    this.fail('摄像头未授权或被占用');
-  },
-
   fail: function (msg) {
+    this._running = false;
     this.setData({
       running: false,
       status: '出错了',
@@ -317,7 +361,7 @@ Page({
     this.countFrame(now);
 
     var a = anchors && anchors[0];
-    var raw = a && a.points && a.points.length >= 21 ? a.points : null;
+    var raw = (a && a.points && a.points.length >= 21) ? a.points : null;
 
     var mode = this.gate.update(!!raw, now);
 
@@ -334,7 +378,7 @@ Page({
     if (mode === 'lost') {
       if (this._handVisible) {
         this._handVisible = false;
-        this.drawOverlay(null);
+        if (this.glv) this.glv.setPoints(null, -1);
         this.setData({ handVisible: false, focusFlex: '—', angleCards: buildCards() });
         this.drawGauge(0);
       }
@@ -342,12 +386,18 @@ Page({
     }
 
     // mode === 'track'
-    var norm = handCore.normalizePoints(raw, FRAME.w, FRAME.h, POINTS_ARE_PIXELS);
+    var norm = handCore.normalizePoints(raw, 0, 0, POINTS_ARE_PIXELS);
     var smooth = this.lm.filter(norm, now);
     var angles = this.ang.filter(handCore.computeFingerAngles(smooth), now);
 
-    this.drawOverlay(smooth);
+    if (this.glv) this.glv.setPoints(smooth, this.focusTipIndex());
     this.pushUI(angles, raw.length, now);
+  },
+
+  focusTipIndex: function () {
+    var key = FINGER_KEYS[this.data.fingerIndex];
+    if (!key) return -1;
+    return handCore.FINGER_DEFS[key].ids[3];
   },
 
   onRemoveAnchors: function () {
@@ -368,14 +418,12 @@ Page({
 
   /**
    * 更新读数。setData 每帧调用会拖垮小程序，所以：
-   *   · 画面（骨架/环表）走 canvas，不走 setData
+   *   · 画面（相机/骨架/环表）走 canvas，不走 setData
    *   · 数字读数节流到 ~150ms，且经显示滞回，本来也不需要每帧刷
    */
   pushUI: function (angles, pointCount, now) {
     if (now - this._lastPush < 150) return;
     this._lastPush = now;
-
-    var focusKey = FINGER_KEYS[this.data.fingerIndex];
 
     var cards = handCore.FINGER_ORDER.map(function (name) {
       var def = handCore.FINGER_DEFS[name];
@@ -386,7 +434,6 @@ Page({
         tag: def.joints.map(function (j) { return j.toUpperCase(); }).join(' · '),
         joints: def.joints.map(function (j, i) {
           var deg = d.angles[i];
-          // 显示滞回：只影响读数与刻度，3D/桥接用的仍是真实平滑值
           var shown = this.disp.value(name + '-' + j, deg);
           return {
             k: j.toUpperCase(),
@@ -397,6 +444,7 @@ Page({
       };
     }, this);
 
+    var focusKey = FINGER_KEYS[this.data.fingerIndex];
     var flexRaw;
     if (focusKey) {
       flexRaw = angles[focusKey].flex;
