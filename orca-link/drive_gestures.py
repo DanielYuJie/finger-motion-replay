@@ -76,15 +76,19 @@ def curl_for(pattern: str, t: float, period_s: float) -> dict[str, float]:
 def payload_for(pattern: str, t: float, period_s: float) -> dict:
     curl = curl_for(pattern, t, period_s)
     world = hand_landmarks(curl)
-    # 顺带把屈曲角也按 0-100 的索引报上去（ORCA 路径只用 world_landmarks，
-    # 但保持与浏览器 payload 同形，方便同一个消费者复用）
+    # 只报 flex（0-100 索引），**不要**补上 mcp/pip/dip。
+    #
+    # 这里踩过一个坑：原先写的是 {"flex": .., "mcp": 0.0, "pip": 0.0, "dip": 0.0}，
+    # 本意是「留空的键填 0」，实际上会让仿射映射路径彻底失效 ——
+    # orca_hand_map.from_vision_payload 的逻辑是「只要逐关节键存在就优先用它」，
+    # 只有在一个逐关节键都没匹配上时才回落到 flex。于是那三个 0.0 覆盖掉真实屈曲量，
+    # 17 个关节的目标全变成中立位，表现为「帧数在涨、手一动不动」。
+    # （grpc 路径只用 world_landmarks，不看 fingers，所以这个改动对它无影响。）
     return {
         "hand": True,
         "source": "synthetic-gestures",
         "world_landmarks": world,
-        "fingers": {
-            f: {"flex": 100.0 * curl[f], "mcp": 0.0, "pip": 0.0, "dip": 0.0} for f in FINGERS
-        },
+        "fingers": {f: {"flex": 100.0 * curl[f]} for f in FINGERS},
     }
 
 
