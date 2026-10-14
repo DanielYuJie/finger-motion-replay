@@ -294,6 +294,73 @@ OpenMP 撞车、重定向配置必须纯 ASCII）都是实测踩出来的 ——
 所以目前的接入状态是：**「手机 → 17 个 ORCA 关节目标」已打通并验证**，
 差的是把关节目标送到 MuJoCo 画面（需要上表这套环境）。
 
+### 用关节角直接驱动仿真（`sim_drive.py`，不需要重定向器）
+
+`--drive sim` 那条官方路径的输入是 `AdaptiveAnalyticalRetargeter`，而重定向器要
+**米制、腕部相对的 `world_landmarks`** —— 微信小程序走 VisionKit **2D**，只有 0–1
+归一化图像坐标，拿不到（VisionKit 3D 要微信 ≥ 8.1.0）。所以手机数据喂不进那条路。
+
+但 `orca_sim` 的 env **直接吃关节位置**，而 `orca_hand_map.from_vision_payload()`
+已经把 payload 映射成了 17 个关节目标。`sim_drive.py` 就是把这两端接起来：
+
+```
+小程序 / drive_gestures / 网页端 ──POST /update──▶ orca_bridge.py (8766)
+                                                      │
+                        sim_drive.py 轮询 GET /orca_joints ──▶ orca_sim 的 MuJoCo env
+```
+
+好处：**torch / pinocchio / nlopt / grpcio 全都不需要**，只要 `mujoco` + `gymnasium`
++ `orca_sim` + `orca_core`。数据入口仍是 orca_bridge，不新开端口，所以同一只手可以
+同时驱动 MC 机械手（转发）、ORCA 映射（`/orca_joints`）和仿真。
+
+```powershell
+# 终端1：入口
+python orca_bridge.py --sink print --host 0.0.0.0
+# 终端2：仿真（弹出 MuJoCo 交互窗口）
+python sim_drive.py --render human
+# 终端3：没接手机时用合成手势驱动（--seconds 0 = 一直跑）
+python drive_gestures.py --pattern pulse --seconds 0 --hz 30
+```
+
+实测（合成 pulse，30Hz，120 帧）：17 个执行器与 config `joint_ids` 一一映射，
+**120/120 帧取到桥接数据**，关节在 ~12° 与 ~106° 之间往复：
+
+![关节目标驱动的仿真帧](docs/sim-from-joints.png)
+
+⚠️ 两个坑（都踩过）：
+
+1. **`orca_core` 的手配置目录名是连字符**：`models/v2/orcahand-right/config.yaml`，
+   而上游 sim sink 拼的是下划线 `orcahand_right` → 返回 `None` 并在 `connect()` 抛
+   `RuntimeError`（即上文「坑 5」）。`sim_drive.py` 直接拼对。
+2. `orca_sim` 的 `render_mode` 只接受 `None` / `"human"` / `"rgb_array"`，
+   传字符串 `"none"` 会 `ValueError: Unsupported render_mode`。
+
+环境安装（本机实际用的路径，与上文 `D:\tools\miniconda` 不同）：
+
+```powershell
+# conda 环境落在用户目录（ProgramData 需提权，conda 会自动回退）
+C:\ProgramData\miniconda3\Scripts\conda.exe create -n orca-teleop `
+    --override-channels -c https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge `
+    python=3.12 pinocchio=4.1.0 nlopt pyyaml -y
+$py = "C:\Users\<你>\.conda\envs\orca-teleop\python.exe"
+& $py -m pip install mujoco gymnasium pillow
+& $py -m pip install --no-deps -e <orca-ecosystem>\orca_core-upstream
+& $py -m pip install -e <orca-ecosystem>\orca_sim
+# orca_core 的导入链会走到 hardware/hand_serial_link.py -> import serial，所以
+& $py -m pip install pyserial dynamixel-sdk fastapi uvicorn
+```
+
+四个上游检出（都在 `orca-ecosystem/`，已 gitignore）：
+
+```
+git clone --depth 1 https://github.com/orcahand/orca_core.git            orca_core-upstream
+git clone --depth 1 https://github.com/orcahand/orca_teleop.git          orca_teleop
+git clone --depth 1 https://github.com/orcahand/orcahand_description.git orcahand_description
+git clone --depth 1 https://github.com/orcahand/orca_sim.git             orca_sim
+```
+
+> `orca_teleop` 只在走重定向器（Path A / grpc）时才需要；`sim_drive.py` 那条路不用它。
+
 ### 其它行为特征
 
 - **前 30 帧重定向器返回 `None`**，是自动尺度标定期，机械手保持 `init_joints()` 姿态不动。
