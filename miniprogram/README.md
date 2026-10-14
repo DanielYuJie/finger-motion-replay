@@ -63,8 +63,8 @@
 | [`core/hand.js`](core/hand.js) | 21 点定义、关节角解算、坐标归一化 | ✅ **Node 量化验证** |
 | [`core/stability.js`](core/stability.js) | One-Euro、显示滞回、出现/离开判定 | ✅ **Node 量化验证** |
 | [`app.json`](app.json) / [`app.js`](app.js) / [`app.wxss`](app.wxss) | 全局配置、基础库检查、设计令牌 | ⚠️ 仅语法 / JSON 校验 |
-| [`pages/capture/`](pages/capture/) | 页面：VKSession + WebGL 画面/骨架 + 仪表 UI | ✅ 会话与相机已在真机跑通；⚠️ 新 GL 渲染路径待真机确认 |
-| [`core/glview.js`](core/glview.js) | WebGL 渲染层：YUV 相机预览 + 骨架（照官方 `yuvBehavior.js`） | ⚠️ 接线已测，真机渲染待确认 |
+| [`pages/capture/`](pages/capture/) | 页面：VKSession + WebGL 画面/骨架 + 仪表 UI | ✅ **iPhone 真机验证通过** |
+| [`core/glview.js`](core/glview.js) | WebGL 渲染层：YUV 相机预览 + 骨架（照官方 `yuvBehavior.js`） | ✅ **iPhone 真机验证通过** |
 | [`test/verify.js`](test/verify.js) | 自检脚本（纯 Node，51 项断言） | ✅ **51/51 通过** |
 | [`project.config.json`](project.config.json) | appid 与编译配置 | ✅ 已填 |
 
@@ -129,9 +129,21 @@ node miniprogram/test/verify.js
 经 YUV 着色器上屏（见 [`core/glview.js`](core/glview.js)），骨架也画在同一块 WebGL 画布内
 （native canvas 互相叠加不保证合成，官方同样用 GL 画点）。
 
-**仍未验证的部分**：这条新的 WebGL 渲染路径**没在真机上跑过**。静态测试只能保证接线正确
-（51/51 通过，含 `WXML 不含 <camera>`、`start 后启动了帧循环` 两条回归防线），
-不能保证真机渲染结果。
+**已真机验证通过（iPhone）**。重编译后用「真机调试」运行，仪器条实测：
+
+| 读数 | 实测值 | 说明 |
+|---|---|---|
+| 帧率 | **30 fps** | 跑满帧循环设定的 30fps 上限 |
+| 画面帧 | **457 帧** | `getVKFrame` 稳定取帧 —— 这一环在修复前完全是死的 |
+| 关键点 | **21 点** | 骨架与手对齐准确 |
+| 基础库 | **3.15.3** | 手机实际版本（模拟器为 3.17.4），远高于 2.28.0 门槛 |
+
+「已检测到手」徽标正常点亮、状态为「采集中 · 识别中」，说明相机帧链路、
+帧分析、21 点检测、归一化坐标映射、YUV 上屏与 GL 骨架这一整条路径都通了。
+另外 `mirror` 默认 `false` 时骨架方向正确，无需镜像。
+
+静态测试（51/51 通过，含 `WXML 不含 <camera>`、`start 后启动了帧循环` 两条回归防线）
+只覆盖接线正确性，真机结论以上面这次运行为准。
 
 ---
 
@@ -181,7 +193,7 @@ node miniprogram/test/verify.js
 - **基础库检查**：`app.js` 会弹窗提示基础库 < 2.28.0
 
 iPhone 性能预期：VisionKit 为系统能力、推理开销低，帧率主要受 WebGL 绘制与 `setData`
-节流影响，旧机型约 15–30fps。
+节流影响。**实测跑满 30 fps**（帧循环上限）。
 
 ### iPhone 真机预览
 
