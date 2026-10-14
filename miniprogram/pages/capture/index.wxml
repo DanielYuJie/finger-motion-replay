@@ -82,6 +82,21 @@
       <switch checked="{{showAngles}}" color="#3d9cf0" bindchange="onShowAnglesChange" />
     </view>
 
+    <view class="row">
+      <text class="row-label">上行到 ORCA / 机械手</text>
+      <switch checked="{{bridgeOn}}" color="#3d9cf0" bindchange="onBridgeChange" />
+    </view>
+
+    <view class="row" wx:if="{{bridgeOn}}">
+      <text class="row-label">上行地址</text>
+      <input class="bridge-input" type="text" placeholder="IP:8766(ORCA) 或 IP:8765(MC)" value="{{bridgeAddr}}" bindinput="onBridgeAddrInput" />
+    </view>
+
+    <view class="row" wx:if="{{bridgeOn}}">
+      <text class="row-label">上行状态</text>
+      <text class="bridge-status">{{bridgeStatus}}</text>
+    </view>
+
     <view class="actions">
       <button class="btn primary" bindtap="onStart" disabled="{{running}}">开启摄像头</button>
       <button class="btn" bindtap="onStop" disabled="{{!running}}">关闭</button>

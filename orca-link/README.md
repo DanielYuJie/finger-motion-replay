@@ -241,6 +241,59 @@ python drive_synthetic.py --seconds 9 --hz 30
 [live] #173   in·mcp=  9.1   mi·mcp= 12.1  ...   <- 张开
 ```
 
+### 从手机小程序接入（局域网，已实测）
+
+`miniprogram/` 那套视觉主端（微信 VisionKit，iPhone 真机实测 30fps / 21 点）可以直接
+drive 这一层，**不需要改 bridge 的任何代码** —— payload 结构与网页端 `app.js` 一致。
+
+```powershell
+# 终端 1：MC 中继（可选，用来验证「一只手同时驱动两边」）
+python bridge_server.py --host 0.0.0.0
+
+# 终端 2：ORCA 桥接 —— 必须 --host 0.0.0.0，否则手机连不上（默认只监听回环）
+python orca_bridge.py --sink print --host 0.0.0.0
+```
+
+小程序里开启「上行到 ORCA / 机械手」，地址填 **`<电脑局域网IP>:8766`**。
+不要填 8765 —— 8765 只驱动 MC；8766 会映射到 17 个 ORCA 关节**并**把原始 payload
+转发给 8765，所以填 8766 时两边一起动。
+
+`--host` 就是为手机接入加的（`--port` 的同款用法）。
+
+**实测（本机回环，payload 与小程序的完全同构）**：
+
+```
+POST /update {"hand":true,"source":"miniprogram-visionkit","fingers":{...}} → {"ok":true,"frames":1}
+GET  /orca_joints（7ms 后）  hand=true   index_mcp=80.4  index_pip=76.7  thumb_mcp=79.9   ← 输入 80/70/60
+GET  /orca_joints（800ms 后）hand=false  index_mcp= 2.0                              ← miss_grace_ms=250 回中立
+GET  http://127.0.0.1:8765/angles → 原样拿到五指数据（forwarded=1, forward_failed=0）
+```
+
+注意后两行：**超过 `miss_grace_ms`（默认 250ms）没有新帧就回中立位**。
+小程序是 10Hz（100ms）推送，正好压在这个宽限期以内；若把推送降到 5Hz 以下，
+ORCA 侧会在中立位与目标之间来回跳 —— 排查时别误判成"映射坏了"。
+
+**当前用的是近似 ROM**：本机没有 orca_core 检出，启动日志会提示
+`未找到 orca_core 检出（FileNotFoundError），改用内置 ROM 副本`。
+映射照常可用，但 ROM 是内置副本；装上 orca_core 后 `mapping_source` 会变成真实 config.yaml。
+
+### 仿真（`--drive sim`）当前跑不起来 —— 缺整套机器人侧依赖
+
+已核查本机，以下**一个都没有**：
+
+| 依赖 | 状态 |
+|---|---|
+| `orca_core` / `orca_sim` / `orcahand_description` 检出 | ❌ 无 |
+| `mujoco` / `gymnasium` | ❌ 无 |
+| `orca-teleop` 环境（含 conda-forge 的 Pinocchio/NLopt） | ❌ 无 |
+
+补齐顺序见上方「快速开始」与「Path A」；那两节记录的 Windows 坑
+（`pin`/`cmeel-*` 在 PyPI 无 Windows 轮子、`joint_name_aliases` 方向是反的、
+OpenMP 撞车、重定向配置必须纯 ASCII）都是实测踩出来的 —— 照官方 README 装必然失败。
+
+所以目前的接入状态是：**「手机 → 17 个 ORCA 关节目标」已打通并验证**，
+差的是把关节目标送到 MuJoCo 画面（需要上表这套环境）。
+
 ### 其它行为特征
 
 - **前 30 帧重定向器返回 `None`**，是自动尺度标定期，机械手保持 `init_joints()` 姿态不动。

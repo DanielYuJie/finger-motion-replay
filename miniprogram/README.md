@@ -34,7 +34,7 @@
 | 骨架覆盖层 | canvas 2D | canvas 2D | ✅ 已移植 |
 | 关节角仪表 / 环表 | CSS + DOM | WXSS + canvas 圆环 | ✅ 已移植 |
 | 3D 复现 | Three.js | — | ❌ 见下 |
-| MC 桥接 | 本机 HTTP :8765 | — | ❌ 见下 |
+| MC 桥接 | wx.request → 局域网中继 :8765 | — | ✅ 已实现（局域网方案，见下） |
 
 ### 为什么 3D 复现没移植
 
@@ -42,15 +42,36 @@
 但是基于较旧版本的三方移植）。要做得动用 canvas 2D 的等距投影重画参数化手指更稳、体积更小。
 当前版本先画骨架叠加层，3D 留作下一步。
 
-### 为什么 MC 桥接没移植
+### 局域网桥接（已实现，可驱动 MC 机械手与 ORCA 灵巧手）
 
-两道硬约束：
+两道硬约束依然存在，但**开发/真机验证阶段有零成本绕法**：
 
-1. 小程序的 `wx.request` **不能访问 `127.0.0.1` / `localhost`**；
-2. 请求域名必须在小程序后台配置为**「request 合法域名」且必须是 HTTPS**。
+1. 小程序的 `wx.request` **不能访问 `127.0.0.1` / `localhost`** → 电脑上以 `--host 0.0.0.0` 启动中继，小程序填**电脑的局域网 IP**；
+2. 请求域名必须是 HTTPS 合法域名 → 开发者工具「详情 → 本地设置」勾选**「不校验合法域名」**（真机调试/预览同样生效）。
 
-所以要让真手驱动 Minecraft，需要把 [`../bridge_server.py`](../bridge_server.py) 部署到一台
-公网服务器上，小程序 POST 到 `https://your.domain/update`。这一条完全可行，但需要你有域名和服务器。
+已在 `pages/capture/index.js` 实现「上行到 ORCA / 机械手」开关 + 地址输入 + 状态显示，
+payload 与网页端 `app.js` 完全一致（`source: 'miniprogram-visionkit'`），10Hz 节流推送，
+手丢失/关闭时推 `hand:false` 让机械手回零。
+
+**地址填哪个决定驱动谁**（两个中继默认都只监听 `127.0.0.1`，不开 `--host 0.0.0.0` 手机永远连不上）：
+
+| 填的地址 | 中继 | 效果 |
+|---|---|---|
+| `IP:8765` | `bridge_server.py` | 只驱动 MC 机械手 |
+| `IP:8766` | `orca-link/orca_bridge.py` | 驱动 ORCA（映射到 17 个关节），**并异步把原始 payload 转发给 8765**，MC 机械手照样动 |
+
+想「一只手同时驱动两边」就填 **8766**。
+
+联调步骤：
+1. 电脑起中继（ORCA 那条要另开一个窗口起 MC 中继以接收转发）：
+   - `python bridge_server.py --host 0.0.0.0`
+   - `python orca-link/orca_bridge.py --sink print --host 0.0.0.0`
+2. （仅 MC）Minecraft + CC 电脑执行 `mc_hand.lua`（轮询 `127.0.0.1:8765/angles` 不变）
+3. iPhone 与电脑连**同一 Wi-Fi**；开发者工具勾选不校验合法域名
+4. 小程序开启上行开关，地址填 `电脑局域网IP:8766`（查 IP：电脑上 `ipconfig`）
+
+> 正式发布时上述绕法失效（合法域名强制 HTTPS），仍需把中继部署到公网服务器，
+> 小程序 POST `https://your.domain/update` —— 需要域名和服务器，留待后续。
 
 ---
 
@@ -219,7 +240,7 @@ iPhone 性能预期：VisionKit 为系统能力、推理开销低，帧率主要
 | 方向 | 说明 |
 |---|---|
 | **3D 复现** | canvas 2D 等距投影最稳；要真 3D 就接 `threejs-miniprogram` |
-| **MC 桥接** | 公网中继 + request 合法域名（需服务器与域名） |
+| **MC 桥接** | 局域网中继已实现；正式发布仍需公网 HTTPS 中继 |
 | **3D 关键点** | 微信 ≥8.1.0 提供 `points3d`（MANO-16 关节定义）——**这是网页版没有的能力**，可做真正的立体手势 |
 | **手势分类** | VisionKit 的 `anchor.gesture` 直接给出分类，网页版还需要自己算 ——**同样是白捡的** |
 | **静态图片检测** | `mode: 2` + `detectHand({frameBuffer,...})`，可做「拍照识别手势」 |

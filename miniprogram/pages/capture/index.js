@@ -32,6 +32,17 @@ var glview = require('../../core/glview.js');
 // 见上文坑 2：VisionKit 的 points 已是 0–1 归一化
 var POINTS_ARE_PIXELS = false;
 
+// ── 上行：把关节角推给中继服务，驱动机械手 / ORCA 灵巧手 ──
+// 两个可选目标（见 pushBridge 的说明）：
+//   IP:8765  bridge_server.py  → MC 机械手
+//   IP:8766  orca_bridge.py    → ORCA（17 关节映射），并转发给 8765，两边同时动
+// 小程序不能访问 127.0.0.1/localhost，必须填「电脑的局域网 IP」：
+//   · iPhone 与电脑连同一 Wi-Fi；电脑上以 --host 0.0.0.0 启动对应服务
+//     （两个服务默认都只监听 127.0.0.1，不开就永远连不上）
+//   · 开发者工具「详情→本地设置」勾选「不校验合法域名」才能请求 http:// 地址
+//   · 推送频率 10Hz（100ms）足够；桥接侧 command_hz 是 30Hz，会自行插值
+var BRIDGE_INTERVAL_MS = 100;
+
 var FINGER_LABELS = ['全部', '食指', '中指', '无名指', '小指', '拇指'];
 var FINGER_KEYS = [null, 'index', 'middle', 'ring', 'pinky', 'thumb'];
 
@@ -91,6 +102,9 @@ Page({
     sdkVersion: '—',
     mirror: false,          // 官方示例不对点做镜像；如画面感觉左右反了，打开这个开关
     showAngles: true,
+    bridgeOn: false,        // 是否把关节角推送到机械手中继
+    bridgeAddr: '',         // 电脑局域网地址，形如 192.168.1.100:8765
+    bridgeStatus: '未连接',
     fingerLabels: FINGER_LABELS,
     fingerIndex: 0,
     focusFlex: '—',
@@ -119,6 +133,7 @@ Page({
     this._lastGfxPush = 0;
     this._handVisible = false;
     this._fps = 0;
+    this._lastBridge = 0;   // 桥接推送节流用
 
     var app = getApp();
     this.setData({ sdkVersion: (app && app.globalData && app.globalData.sdkVersion) || '—' });
@@ -327,6 +342,7 @@ Page({
 
     this._gfxFrames = 0;
     this._gfxNull = 0;
+    this.pushBridge(null, false);   // 关闭时通知机械手回零
 
     this.setData({
       running: false,
@@ -382,6 +398,7 @@ Page({
         this.setData({ handVisible: false, focusFlex: '—', angleCards: buildCards() });
         this.drawGauge(0);
       }
+      this.pushBridge(null, false);   // 手丢了：通知机械手回零
       return;
     }
 
@@ -392,6 +409,7 @@ Page({
 
     if (this.glv) this.glv.setPoints(smooth, this.focusTipIndex());
     this.pushUI(angles, raw.length, now);
+    this.pushBridge(angles, true);    // 桥接：推送五指关节角
   },
 
   focusTipIndex: function () {
@@ -479,5 +497,76 @@ Page({
 
   onShowAnglesChange: function (e) {
     this.setData({ showAngles: e.detail.value });
+  },
+
+  /* ---------------- 机械手桥接 ---------------- */
+
+  onBridgeChange: function (e) {
+    var on = e.detail.value;
+    this.setData({ bridgeOn: on });
+    if (on) {
+      if (!(this.data.bridgeAddr || '').trim()) {
+        this.setData({ bridgeStatus: '请填电脑局域网 IP:8766(ORCA) 或 :8765(MC)' });
+      } else {
+        this._bridgeStatus('已连接');
+      }
+    } else {
+      this._bridgeStatus('未连接');
+    }
+  },
+
+  onBridgeAddrInput: function (e) {
+    this.setData({ bridgeAddr: e.detail.value });
+  },
+
+  /** 只在状态变化时 setData，避免高频推送把状态条刷崩 */
+  _bridgeStatus: function (t) {
+    if (this.data.bridgeStatus !== t) this.setData({ bridgeStatus: t });
+  },
+
+  /**
+   * 把五指关节角推给中继服务（POST /update）。
+   * 10Hz 节流；payload 结构与网页端 app.js 完全一致。
+   *
+   * 地址可填两个服务之一，取决于你要驱动什么：
+   *   · IP:8765  bridge_server.py —— 只驱动 MC 机械手
+   *   · IP:8766  orca_bridge.py   —— 驱动 ORCA（映射到 17 个关节），
+   *              并会把原始 payload 异步转发给 8765，所以 MC 机械手照样动。
+   *              想「一只手同时驱动两边」就填 8766。
+   */
+  pushBridge: function (angles, hand) {
+    if (!this.data.bridgeOn) return;
+    var addr = (this.data.bridgeAddr || '').trim();
+    if (!addr) return;
+    var now = Date.now();
+    if (now - this._lastBridge < BRIDGE_INTERVAL_MS) return;
+    this._lastBridge = now;
+
+    // angles 为 null 表示「手已离开画面」，此时要发的是一帧全 0（让机械手回零）。
+    // 原实现在这里直接 angles[name]，会对 null 取属性抛 TypeError —— 只在
+    // 「桥接已开启 + 关闭采集/手丢失」时才触发，所以容易漏掉。
+    var ZERO = { flex: 0, angles: [0, 0, 0] };
+    var fingers = {};
+    var keys = handCore.FINGER_ORDER;
+    for (var i = 0; i < keys.length; i++) {
+      var name = keys[i];
+      var d = (angles && angles[name]) || ZERO;
+      fingers[name] = {
+        flex: Math.round(d.flex * 100) / 100,
+        mcp: Math.round(d.angles[0] * 100) / 100,
+        pip: Math.round(d.angles[1] * 100) / 100,
+        dip: Math.round(d.angles[2] * 100) / 100
+      };
+    }
+    var payload = { hand: !!hand, source: 'miniprogram-visionkit', fingers: fingers };
+    var self = this;
+    wx.request({
+      url: 'http://' + addr + '/update',
+      method: 'POST',
+      header: { 'Content-Type': 'application/json' },
+      data: payload,
+      success: function () { self._bridgeStatus('已连接'); },
+      fail: function () { self._bridgeStatus('连接失败'); }
+    });
   }
 });

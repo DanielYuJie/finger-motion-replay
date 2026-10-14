@@ -1,21 +1,21 @@
 """
 关节角中继服务（CC:Tweaked 桥接）
 --------------------------------
-浏览器端做 MediaPipe 追踪 → POST /update 推送五指关节角
+浏览器端/小程序端做手部追踪 → POST /update 推送五指关节角
 CC:Tweaked 电脑 → GET /angles 轮询最新角度
 
 只用标准库，不依赖 mediapipe / opencv。
 
-启动：  python bridge_server.py
-默认端口 8765
-
+启动：  python bridge_server.py               # 仅本机（127.0.0.1:8765）
+        python bridge_server.py --host 0.0.0.0  # 局域网接入（小程序真机用）
 接口：
-  POST /update   浏览器推送角度（JSON）
+  POST /update   浏览器/小程序推送角度（JSON）
   GET  /angles   CC 轮询，返回最新角度
   GET  /health   健康检查
   GET  /reset    清空当前状态
 """
 
+import argparse
 import json
 import threading
 import time
@@ -23,6 +23,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HOST = "127.0.0.1"
 PORT = 8765
+
+# 实际绑定的地址/端口（main 里按命令行参数更新，供 /health 回显）
+BOUND = {"host": HOST, "port": PORT}
 
 # 数据超过这个秒数没更新，就认为手不在画面里
 STALE_SECONDS = 1.0
@@ -87,7 +90,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/angles":
             self._send(snapshot())
         elif path == "/health":
-            self._send({"ok": True, "port": PORT, "fingers": FINGER_ORDER})
+            self._send({"ok": True, "host": BOUND["host"], "port": BOUND["port"], "fingers": FINGER_ORDER})
         elif path == "/reset":
             with _lock:
                 _state["ts"] = 0.0
@@ -136,9 +139,16 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    srv = ThreadingHTTPServer((HOST, PORT), Handler)
-    print(f"[bridge] 监听 http://{HOST}:{PORT}")
-    print(f"[bridge]   POST /update  ← 浏览器推送角度")
+    ap = argparse.ArgumentParser(description="关节角中继服务")
+    ap.add_argument("--host", default=HOST,
+                    help="监听地址；默认 127.0.0.1 仅本机，小程序真机联调用 0.0.0.0")
+    ap.add_argument("--port", type=int, default=PORT, help="监听端口，默认 8765")
+    args = ap.parse_args()
+
+    BOUND["host"], BOUND["port"] = args.host, args.port
+    srv = ThreadingHTTPServer((args.host, args.port), Handler)
+    print(f"[bridge] 监听 http://{args.host}:{args.port}")
+    print(f"[bridge]   POST /update  ← 浏览器/小程序推送角度")
     print(f"[bridge]   GET  /angles  ← CC:Tweaked 轮询")
     print(f"[bridge]   GET  /health  /reset")
     print("[bridge] Ctrl+C 退出")

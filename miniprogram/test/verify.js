@@ -214,6 +214,7 @@ function mockCanvasNode() {
 var canvasNodes = [mockCanvasNode(), mockCanvasNode()];
 var rafCalls = 0;
 var pendingFrames = [];   // 帧回调交给测试手动驱动：mock 里真去循环会死循环
+var requests = [];        // 上行（wx.request）记录
 
 global.wx = {
   getWindowInfo: function () { return { pixelRatio: 2 }; },
@@ -232,6 +233,8 @@ global.wx = {
   authorize: function (o) { o.success && o.success(); },
   showModal: function (o) { modalCalls.push(o); },
   openSetting: function () {},
+  // 上行请求的替身：记录下来供断言，并立即回调 success
+  request: function (o) { requests.push(o); if (o.success) o.success({ statusCode: 200 }); },
   createVKSession: function (opts) {
     var handlers = {};
     sessionObj = {
@@ -391,6 +394,65 @@ section('=== B7. 画布 / WebGL 不可用时的容错 ===');
   check('取不到画布时不抛异常', threw === null, threw ? threw.message : '');
   check('取不到画布时给出提示', Array.isArray(tips) && tips.length > 0, (tips && tips[0]) || '');
   check('无 GL 时点开始会明确报错而非静默', status === '出错了', 'status=' + status);
+})();
+
+section('=== B8. 上行到 ORCA / 机械手 ===');
+(function () {
+  var NAMES = ['thumb', 'index', 'middle', 'ring', 'pinky'];
+  function fakeAngles() {
+    var a = {};
+    for (var i = 0; i < NAMES.length; i++) {
+      a[NAMES[i]] = { flex: 30 + i, angles: [10 + i, 20 + i, 30 + i] };
+    }
+    return a;
+  }
+
+  var i3 = makeInstance(pageDef);
+  i3.onLoad();
+  i3.onReady();
+  i3.setData({ bridgeOn: true, bridgeAddr: '192.168.1.9:8766' });
+
+  // ---- 正常帧 ----
+  NOW += 500;
+  requests.length = 0;
+  i3.pushBridge(fakeAngles(), true);
+  var req = requests[0];
+  check('上行发出了一次请求', requests.length === 1);
+  check('URL 为所填地址 + /update',
+    !!req && req.url === 'http://192.168.1.9:8766/update', req && req.url);
+  check('payload 含 hand 与五指', !!req && req.data.hand === true &&
+    NAMES.every(function (n) { return !!req.data.fingers[n]; }));
+  check('每指带 flex/mcp/pip/dip',
+    !!req && NAMES.every(function (n) {
+      var f = req.data.fingers[n];
+      return typeof f.flex === 'number' && typeof f.mcp === 'number' &&
+        typeof f.pip === 'number' && typeof f.dip === 'number';
+    }));
+  check('angles[0..2] 依次映射为 mcp/pip/dip',
+    !!req && req.data.fingers.index.mcp === 11 && req.data.fingers.index.pip === 21 &&
+    req.data.fingers.index.dip === 31);
+
+  // ---- 回归：手离开画面时传 null（原实现在这里对 null 取属性，抛 TypeError）----
+  NOW += 500;
+  requests.length = 0;
+  var threw = null;
+  try { i3.pushBridge(null, false); } catch (e) { threw = e; }
+  check('pushBridge(null) 不抛异常（曾对 null 取属性）', threw === null, threw ? threw.message : '');
+  check('手离开时发全 0 且 hand=false',
+    requests.length === 1 && requests[0].data.hand === false &&
+    NAMES.every(function (n) { return requests[0].data.fingers[n].flex === 0; }));
+
+  // ---- 节流 ----
+  requests.length = 0;
+  i3.pushBridge(fakeAngles(), true);
+  check('节流生效（同一时刻不重复发）', requests.length === 0, 'requests=' + requests.length);
+
+  // ---- 关闭后不再上行 ----
+  i3.setData({ bridgeOn: false });
+  NOW += 500;
+  requests.length = 0;
+  i3.pushBridge(fakeAngles(), true);
+  check('关闭后不再上行', requests.length === 0);
 })();
 
 Date.now = realNow;

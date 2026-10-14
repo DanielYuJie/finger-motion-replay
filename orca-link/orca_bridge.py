@@ -490,6 +490,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", default=str(Path(__file__).with_name("bridge_config.yaml")))
     parser.add_argument("--sink", choices=["print", "orca", "grpc"], default=None, help="覆盖配置里的 sink")
     parser.add_argument("--port", type=int, default=None, help="覆盖配置里的端口")
+    parser.add_argument(
+        "--host",
+        default=None,
+        help="覆盖配置里的监听地址。手机/其他设备经局域网接入时必须用 0.0.0.0"
+             "（默认配置是 127.0.0.1，只收本机回环，外部连不上）",
+    )
     parser.add_argument("--hand-config", default=None, help="ORCA 的 config.yaml 路径")
     parser.add_argument("--real", action="store_true", help="sink=orca 时连真机（关闭 mock）")
     args = parser.parse_args(argv)
@@ -501,6 +507,8 @@ def main(argv: list[str] | None = None) -> int:
         bridge_cfg["sink"] = args.sink
     if args.port:
         bridge_cfg["port"] = args.port
+    if args.host:
+        bridge_cfg["host"] = args.host
     if args.hand_config:
         bridge_cfg["hand_config"] = args.hand_config
     if args.real:
