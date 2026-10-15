@@ -277,22 +277,24 @@ ORCA 侧会在中立位与目标之间来回跳 —— 排查时别误判成"映
 `未找到 orca_core 检出（FileNotFoundError），改用内置 ROM 副本`。
 映射照常可用，但 ROM 是内置副本；装上 orca_core 后 `mapping_source` 会变成真实 config.yaml。
 
-### 仿真（`--drive sim`）当前跑不起来 —— 缺整套机器人侧依赖
+### 仿真环境：已装好并通过 sim_drive 跑通
 
-已核查本机，以下**一个都没有**：
+> 本节最初写的是「一个都没有」——那是搭建**之前**的盘点，现已全部就位，保留此更正以免误读。
 
 | 依赖 | 状态 |
 |---|---|
-| `orca_core` / `orca_sim` / `orcahand_description` 检出 | ❌ 无 |
-| `mujoco` / `gymnasium` | ❌ 无 |
-| `orca-teleop` 环境（含 conda-forge 的 Pinocchio/NLopt） | ❌ 无 |
+| `orca_core` / `orca_teleop` / `orcahand_description` / `orca_sim` 检出 | ✅ 在 `orca-ecosystem/`（已 gitignore，约 815 MB，用上方 4 条 clone 命令重建） |
+| `mujoco` / `gymnasium` | ✅ 3.15.0 / 1.4.0 |
+| conda 环境 `orca-teleop`（python 3.12 + conda-forge 的 Pinocchio 4.1.0 + NLopt） | ✅ 在 `C:\Users\<你>\.conda\envs\orca-teleop` |
 
-补齐顺序见上方「快速开始」与「Path A」；那两节记录的 Windows 坑
-（`pin`/`cmeel-*` 在 PyPI 无 Windows 轮子、`joint_name_aliases` 方向是反的、
-OpenMP 撞车、重定向配置必须纯 ASCII）都是实测踩出来的 —— 照官方 README 装必然失败。
+仍然**没有**安装的是 `orca_teleop` 这个包本身（`--drive sim` 那条官方路要走它的
+`OrcaHandSimSink` + 重定向器）。但对本项目的目标而言不需要它 —— 见下一节的
+`sim_drive.py`：它直接驱动 `orca_sim` 的 env，**绕开重定向器**，因此也绕开了
+`orca_teleop` 会拖进的 torch / grpcio，以及重定向器必需的 `world_landmarks`。
 
-所以目前的接入状态是：**「手机 → 17 个 ORCA 关节目标」已打通并验证**，
-差的是把关节目标送到 MuJoCo 画面（需要上表这套环境）。
+若日后确实要走官方 `teleop_live.py --drive sim`，再按「快速开始」与「Path A」
+补齐 `orca_teleop`（注意那两节记录的四个 Windows 坑：`pin`/`cmeel-*` 在 PyPI
+无 Windows 轮子、`joint_name_aliases` 方向是反的、OpenMP 撞车、重定向配置必须纯 ASCII）。
 
 ### 用关节角直接驱动仿真（`sim_drive.py`，不需要重定向器）
 
@@ -390,6 +392,21 @@ python webcam_drive.py --image hand.jpg --seconds 3
 实测：真手掌照片 **315/315 帧全部检出**；实时摄像头下
 **4561 帧检出 2612 帧（约 57%，手在画面里进出）**、上行 1888 次 0 失败，
 桥接 `hand=True`、仿真关节值随手指动作实时变化。
+
+**真机验证**：下面这张是同一时刻截下的两个窗口 —— 左边摄像头预览（21 点骨架 +
+五指角度），右边 MuJoCo 里的 ORCA 手，**姿态一致**：
+
+![电脑摄像头实时识别 → MuJoCo 仿真](docs/sim-from-webcam.png)
+
+那一刻的读数是一只**握紧的拳头**，仿真手也随之握紧：
+
+```
+thumb   mcp= 13.2  pip= 32.0  flex= 63.2
+index   mcp= 99.7  pip= 76.3  flex= 87.1
+middle  mcp=120.8  pip= 66.9  flex=100.0
+ring    mcp=139.7  pip= 56.6  flex=100.0
+pinky   mcp=161.6  pip= 30.9  flex=100.0
+```
 
 ⚠️ 一个启动时的坑：**mediapipe 导入 + 模型加载要 8–10 秒**才会发第一帧。
 这段时间里桥接显示 `hand=False` 属正常，不是链路坏了（我一开始就误判过）。
