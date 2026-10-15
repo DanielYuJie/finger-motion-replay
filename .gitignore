@@ -30,6 +30,8 @@ orca-link/docs/parts/
 # 上游官方排盘工程（orcahand_hardware 下载，约 31MB，不入库）
 orca-link/prints/
 orca-link/*.log
+# run_stack.ps1 把各进程日志写到这里
+orca-link/logs/
 # 上游 ORCA 检出（orca_core / orca_teleop / orcahand_description，第三方仓库，不入库）
 orca-ecosystem/
 

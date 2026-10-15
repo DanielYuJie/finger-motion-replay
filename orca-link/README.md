@@ -361,6 +361,60 @@ git clone --depth 1 https://github.com/orcahand/orca_sim.git             orca_si
 
 > `orca_teleop` 只在走重定向器（Path A / grpc）时才需要；`sim_drive.py` 那条路不用它。
 
+### 用电脑本地摄像头直接驱动（`webcam_drive.py`）
+
+不想掏手机时，用这台电脑的摄像头就是最省事的视觉源：
+
+```
+摄像头 ──MediaPipe HandLandmarker（本地 vendor/hand_landmarker.task）──▶ 关节角
+        ──POST /update──▶ orca_bridge(8766) ──▶ sim_drive ──▶ MuJoCo
+```
+
+角度口径与网页端 `app.js`、小程序 `core/hand.js` **完全一致**（同一个
+`angleBetween` / `toFlexion` 与三关节结构），所以三者可以互换喂同一条链路。
+模型直接用仓库里已有的 `vendor/hand_landmarker.task`，**不需要联网下载**。
+
+一处**有意的改进**：网页端/小程序都在 0–1 归一化空间里算角度，而 x/y 缩放不同
+（画面非正方形时）会带来系统性偏差；这里知道真实分辨率，所以**乘回像素再算**，
+几何上才是真角度。
+
+```powershell
+# 实时摄像头（--show 开预览窗，画 21 点骨架与五指角度）
+python webcam_drive.py --show
+# 只识别不发送，先确认能认出你的手
+python webcam_drive.py --show --no-send
+# 单张图片跑一遍（离线验证整条链路，不需要有人举手）
+python webcam_drive.py --image hand.jpg --seconds 3
+```
+
+实测：真手掌照片 **315/315 帧全部检出**；实时摄像头下
+**4561 帧检出 2612 帧（约 57%，手在画面里进出）**、上行 1888 次 0 失败，
+桥接 `hand=True`、仿真关节值随手指动作实时变化。
+
+⚠️ 一个启动时的坑：**mediapipe 导入 + 模型加载要 8–10 秒**才会发第一帧。
+这段时间里桥接显示 `hand=False` 属正常，不是链路坏了（我一开始就误判过）。
+
+### 一键起全套（`run_stack.ps1`）
+
+本仓库路径含空格（`Personal Portfolio Area`），而 `Start-Process` **不会**帮你加引号 ——
+脚本路径不加引号会静默失败：
+
+```
+python.exe: can't open file 'D:\Personal': [Errno 2] No such file or directory
+```
+
+这个坑我在同一次会话里踩了三次，所以把启动逻辑固化成一个脚本：
+
+```powershell
+cd orca-link
+powershell -NoProfile -ExecutionPolicy Bypass -File run_stack.ps1                 # 桥接 + 仿真 + 摄像头
+powershell -NoProfile -ExecutionPolicy Bypass -File run_stack.ps1 -Driver gestures # 用合成手势代替摄像头
+powershell -NoProfile -ExecutionPolicy Bypass -File run_stack.ps1 -Driver none -NoSim   # 只起桥接
+powershell -NoProfile -ExecutionPolicy Bypass -File run_stack.ps1 -Restart         # 先清掉上一轮实例
+```
+
+各进程日志写在 `orca-link/logs/`（已 gitignore）。
+
 ### 其它行为特征
 
 - **前 30 帧重定向器返回 `None`**，是自动尺度标定期，机械手保持 `init_joints()` 姿态不动。
