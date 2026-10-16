@@ -21,6 +21,7 @@ param(
     [ValidateSet('webcam', 'gestures', 'none')][string]$Driver = 'webcam',
     [switch]$NoSim,
     [switch]$Restart,
+    [switch]$Stop,
     [double]$SimFps = 30,
     [double]$CamFps = 15
 )
@@ -29,6 +30,17 @@ $ErrorActionPreference = 'Continue'
 $Here = $PSScriptRoot
 $LogDir = Join-Path $Here 'logs'
 New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
+
+function Stop-Stack {
+    # Match on our own script names so unrelated python processes are never touched.
+    Get-CimInstance Win32_Process -Filter "Name='python.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -match 'orca_bridge\.py|sim_drive\.py|webcam_drive\.py|drive_gestures\.py' } |
+        ForEach-Object {
+            Write-Host ("    kill pid {0}" -f $_.ProcessId)
+            Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+        }
+    Start-Sleep -Seconds 2
+}
 
 function Start-Py {
     # NOTE: the parameter must NOT be named $Args. PowerShell treats $Args as an
@@ -51,15 +63,14 @@ function Start-Py {
     return $p
 }
 
-if ($Restart) {
+if ($Restart -or $Stop) {
     Write-Host "==> stopping previously started instances"
-    Get-CimInstance Win32_Process -Filter "Name='python.exe'" -ErrorAction SilentlyContinue |
-        Where-Object { $_.CommandLine -match 'orca_bridge\.py|sim_drive\.py|webcam_drive\.py|drive_gestures\.py' } |
-        ForEach-Object {
-            Write-Host ("    kill pid {0}" -f $_.ProcessId)
-            Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
-        }
-    Start-Sleep -Seconds 2
+    Stop-Stack
+}
+
+if ($Stop) {
+    Write-Host "==> -Stop given, nothing started. bye."
+    exit 0
 }
 
 if (-not (Test-Path $Python)) { Write-Host "python not found: $Python"; exit 1 }
@@ -108,6 +119,10 @@ Get-CimInstance Win32_Process -Filter "Name='python.exe'" -ErrorAction SilentlyC
         Write-Host ("    pid {0,-7} {1,6} MB  {2}" -f $proc.Id, [math]::Round($proc.WorkingSet64 / 1MB, 0), $proc.MainWindowTitle)
     }
 Write-Host ""
-Write-Host "    stop all:  powershell -File run_stack.ps1 -Restart -Driver none -NoSim"
-Write-Host "    or:        Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | Where-Object { `$_.CommandLine -match 'orca_bridge|sim_drive|webcam_drive|drive_gestures' } | ForEach-Object { Stop-Process -Id `$_.ProcessId -Force }"
+Write-Host "    stop all:  powershell -File run_stack.ps1 -Stop"
 Write-Host "    logs:      $LogDir"
+Write-Host ""
+Write-Host "    NOTE: the children are started from this process, so if you launch this"
+Write-Host "    script as a harness background job and kill the job, the whole stack dies"
+Write-Host "    with it (observed). Run it from your own terminal if it should outlive"
+Write-Host "    the launching shell."
