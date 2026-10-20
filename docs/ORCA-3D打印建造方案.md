@@ -62,13 +62,15 @@ MuJoCo 里跑通的那只手的物理版本。
 > 这是本方案**最大的执行风险**：不是"能不能打印"，而是"买不齐零件"。
 > 先把 `/bill-of-materials` 页和 Discord 里的清单拿到手，再开始采购。
 
-### ② 有 CNC 机加工件
+### ② 有 CNC 件，但**官方明确给了 FDM 替代**
 
 `orca_v2/base/06_CNC/`：`SpoolHolder_CNC.step` 与 `FrankaConnector.step`，各带技术图纸 PDF。
-
-这不是可选项——官网明确写 v2.1 的改进之一就是
+官网也写了 v2.1 的改进之一是
 **"metal spool holders: Spool holders and tensioners are metal in v2.1, printed in v2.0"**。
-也就是说 v2.0 可以打印这些件，**v2.1 用的是金属件**。
+
+⚠️ **但这不是拦路虎**——我解包官方 `Prints-1100.3mf` 后发现，**盘 10 的名字就叫
+`CNC parts (FDM can substitute)`，官方工时 2.5 小时**。也就是说官方把 CNC 件的
+**可打印替代版本**直接放进了打印工程里。你可以选择机加工（更耐久），也可以直接打（2.5h）。
 
 已确认的材料/规格（来自图纸本身）：
 
@@ -253,6 +255,43 @@ git clone https://github.com/orcahand/orcahand_hardware.git   # 约 850 MB
 ```
 
 用 **Bambu Lab Studio** 打开 `orca_v2/base/Prints-1100.3mf`——官方已排好盘并带打印参数。
+
+### 这 10 个盘分别是什么（官方盘名与工时，从 3MF 元数据解出）
+
+![ORCA 打印盘对照](../orca-link/docs/orca-print-plates.png)
+
+| 盘 | 官方盘名 | 工时 | 要打吗 |
+|---|---|---|---|
+| **P1** | `BottomTower Toptower **DYNAMIXEL**` | **13 h** | 用 Dynamixel 就打这个 |
+| **P2** | `BottomTower Toptower **FEETECH**` | **13 h** | 用 Feetech 就打这个（**二选一**） |
+| **P3** | `Spools + Small Parts` | **7 h** | ✅（**0.2 mm 喷嘴**）。线轴在这里，密密麻麻几十个 |
+| **P4** | `Skin (TPU)` | — | ✅ 走 TPU 皮肤时（**TPU 料**） |
+| **P5** | `Carpals Skin (TPU) (L & R)` | — | ✅ 同上（**含左右手两套**） |
+| **P6** | `Carpals (L & R)` | **12 h** | ✅（**0.16 mm 层高**，含左右手两套） |
+| **P7** | `Fingertips Touch (L & R)` | **9.5 h** | ✅（**0.16 mm 层高**，含左右手两套） |
+| **P8** | `Plates + Hulls (OH Board)` | **4.5 h** | ✅（**0.2 mm 喷嘴**） |
+| **P9** | `SidePlate MULTICOLOR` | **1 h** | 可选（多色侧板，**0.2 mm 喷嘴**） |
+| **P10** | `CNC parts (FDM can substitute)` | **2.5 h** | 想省机加工就打这个 |
+
+**总工时：约 49.5 小时**（已排除 P2 备选盘，未含 P4/P5 的 TPU 盘——那两盘官方没给工时）。
+
+从这张图能直接看出来的几件事：
+
+- **P1 与 P2 是同一位置的两个版本**（底部塔身 + 顶部塔身），按舵机家族二选一
+- **P3 上是一大片线轴**——印证了"线轴按电机数量打很多个"，不是只打一个
+- **P4 是 10 个指尖皮肤帽，P5 是两片掌部软皮**，明显是白色/浅色（TPU 盘）
+- **P6 / P7 都标了 `(L & R)`**——**同一盘含左右手两套**，你打一盘会得到两只手的件
+- **P9 是一整块平板**（多色侧板）
+- **P10 是 4 根杆 + 2 个泪滴形件 + 1 个环**，就是 CNC 件的打印替代版
+
+> ⚠️ **需要 0.2 mm 喷嘴**：P3 / P8 / P9 的盘名里明确写了 `(0.2mm)`，P6 / P7 写的是
+> `(0.16mm)` 层高。A1 支持 0.2 喷嘴（`Bambu Lab A1 0.2 nozzle` 配置存在），但要**换喷嘴**。
+> 这也回答了我之前"要不要上 0.2 喷嘴"的疑问——**官方本来就要 0.2**。
+
+> ⚠️ **这个 3MF 没有切片数据**（`Metadata/slice_info.config` 只有 205 字节）。
+> 所以上表的工时来自**官方写在盘名里的标注**，不是切片器的计算值；耗材克数同理没有。
+> 想要精确到克，得自己切一次。
+
 非 Bambu 机型：从 `01_Fingers` / `02_Carpals` / `03_Wrist` / `04_ForeArm` / `05_Spools` /
 `09_Skin` 里取 STL 自己排盘（STEP 源文件同名附带）。
 
