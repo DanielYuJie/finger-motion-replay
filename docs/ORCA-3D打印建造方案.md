@@ -278,11 +278,40 @@ git clone https://github.com/orcahand/orcahand_hardware.git   # 约 850 MB
 从这张图能直接看出来的几件事：
 
 - **P1 与 P2 是同一位置的两个版本**（底部塔身 + 顶部塔身），按舵机家族二选一
-- **P3 上是一大片线轴**——印证了"线轴按电机数量打很多个"，不是只打一个
+- **P3 上是一大片线轴**——不是只打一个
 - **P4 是 10 个指尖皮肤帽，P5 是两片掌部软皮**，明显是白色/浅色（TPU 盘）
 - **P6 / P7 都标了 `(L & R)`**——**同一盘含左右手两套**，你打一盘会得到两只手的件
 - **P9 是一整块平板**（多色侧板）
 - **P10 是 4 根杆 + 2 个泪滴形件 + 1 个环**，就是 CNC 件的打印替代版
+
+#### 每盘到底装了哪些零件（从 3MF 元数据解出，非猜测）
+
+| 盘 | 零件清单 |
+|---|---|
+| **P1** | `ForeArmStructure_Dynamixel_TwoFans` · `WristAdapter_Dynamixel` · `WristStructure_Dynamixel` |
+| **P2** | `ForeArmStructure_Feetech_TwoFans` · `WristAdapter_Feetech` · `WristStructure_Feetech` |
+| **P3** | **`BaseSpool` ×20** · **`SpoolCover` ×20** · **`Ratchet` ×20** · `CarpalsTeeth` · `WristTeeth` · `CableHolder-A` · `CableHolder-B`（共 64 个实例） |
+| **P4** | `DP-Skin_M` ×3 · `DP-Skin_P` · `PP-Skin_I` · `PP-Skin_M` ×2 · `PP-Skin_P` · `PP-Skin_T` · `T-DP_Skin`（共 10 个） |
+| **P5** | `L-Carpals_Skin_TPU` · `R-Carpals_Skin_TPU` |
+| **P6** | `L-Carpals` · `R-Carpals` · `CORE-L` · `CORE-R` |
+| **P7** | `I-AP-L` · `I-AP-R` · `I-IP` · `I-PP` · `M-AP` ×2 · `M-IP` ×2 · `M-PP` ×2 · `P-AP` · `P-IP` · `P-PP` · `L-T-AP` · `R-T-AP` · `T-DP` · `T-PP` · `T-TP-L` · `T-TP-R`（共 19 个） |
+| **P8** | **`HullFront`**（前壳） · **`HullBack`**（后壳） · `HullBack_CableCover`（线缆盖） · `FanCover_TwoFans`（双风扇罩） |
+| **P9** | `SidePlate.step` |
+| **P10** | `FrankaConnector` · **`SpoolHolder` ×4** · **`SpoolTensioner` ×2** |
+
+这份清单修正了我先前几处推断：
+
+- **线轴是 ×20，不是 ×17**——`BaseSpool` / `SpoolCover` / `Ratchet` 各 20 个，
+  17 个电机之外另有 3 套备件。我早先按"每电机一个"推的是 ×17。
+- **`Ratchet` 不是单独一把工具**，也是 ×20——它是**每个线轴配一个**的棘轮环，
+  属于线轴组件（先前说"别当结构件"说窄了）。
+- **P10 的 `SpoolHolder` 只有 ×4**、`SpoolTensioner` ×2——不按电机数量来。
+- **P8 用的是通用件** `HullBack.stl` + `FanCover_TwoFans.stl`，**不是**家族专用的
+  `HullBackDynamixel/Feetech` 或 `FanCover_U2D2`。所以先前说的"9 个家族专属件"里，
+  `HullBack*` 与 `FanCover_*` 属于**可选变体**；真正家族二选一的是 P1/P2 那三个件。
+- **`M-*` 是 ×2**——中指的 AP/IP/PP 同时给**中指和无名指**用，4 根手指只需 I/M/P 三套。
+- **P1/P2 的 `ForeArmStructure_*_TwoFans`** 在仓库散装 STL 里没有同名文件，
+  说明**3MF 的对象名才是权威零件清单**，散装 STL 文件名不完全对应。
 
 > ⚠️ **需要 0.2 mm 喷嘴**：P3 / P8 / P9 的盘名里明确写了 `(0.2mm)`，P6 / P7 写的是
 > `(0.16mm)` 层高。A1 支持 0.2 喷嘴（`Bambu Lab A1 0.2 nozzle` 配置存在），但要**换喷嘴**。
