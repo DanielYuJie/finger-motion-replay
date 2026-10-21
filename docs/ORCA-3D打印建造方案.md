@@ -313,9 +313,32 @@ git clone https://github.com/orcahand/orcahand_hardware.git   # 约 850 MB
 - **P1/P2 的 `ForeArmStructure_*_TwoFans`** 在仓库散装 STL 里没有同名文件，
   说明**3MF 的对象名才是权威零件清单**，散装 STL 文件名不完全对应。
 
-> ⚠️ **需要 0.2 mm 喷嘴**：P3 / P8 / P9 的盘名里明确写了 `(0.2mm)`，P6 / P7 写的是
-> `(0.16mm)` 层高。A1 支持 0.2 喷嘴（`Bambu Lab A1 0.2 nozzle` 配置存在），但要**换喷嘴**。
-> 这也回答了我之前"要不要上 0.2 喷嘴"的疑问——**官方本来就要 0.2**。
+> ✅ **不需要换 0.2 mm 喷嘴**（这里我先前判断错了，已更正）。
+> 盘名里的 `(0.2mm)` / `(0.16mm)` 是**层高**，不是喷嘴直径。依据：
+> `project_settings.config` 里 `nozzle_diameter: 0.4`、`layer_height: 0.16`、
+> `print_settings_id: 0.16mm High Quality @BBL P2S`；而且 **0.16 mm 喷嘴根本不存在**。
+> 原工程是在 **Bambu Lab P2S + 0.4 喷嘴**上做的：`wall_loops: 2`、
+> `sparse_infill_density: 15%`、`Textured PEI Plate`，耗材为 `Generic PLA` + `Generic TPU`。
+
+#### 在 A1 上实际切片的实测结果（P7）
+
+![Bambu Studio 中 A1 切片 P7](../orca-link/docs/orca-bambu-a1-preview-p7.png)
+
+用 **Bambu Lab A1 + 0.4 喷嘴**、`0.16mm` 层高切 P7 的结果：
+
+| 项 | 数值 |
+|---|---|
+| 耗材长度 | 模型 18.04 m + 支撑 1.57 m = **19.60 m** |
+| 耗材重量 | 模型 53.79 g + 支撑 4.88 g = **58.47 g** |
+| **预估时间** | **6 h 47 m**（6h33m + 15m46s 换料） |
+| 换料/擦料 | 1.17 g |
+| 切片设置 | 层高 0.16 mm、稀疏填充 15%、墙层数 2、开启支撑 |
+| 支撑类型 | `Generic-Cylinder`（树状支撑） |
+
+⚠️ **注意：官方盘名标的是 9.5h，A1 实际切出来是 6h47m**——官方那个工时标注偏保守
+（或来自别的机型/设置）。所以前面那张表的 49.5 小时**应视为上限**，实际在 A1 上会更短。
+
+这是目前唯一一个有真实克数的盘（58.47 g）。其余盘需要各自切一次才能拿到准确值。
 
 > ⚠️ **这个 3MF 没有切片数据**（`Metadata/slice_info.config` 只有 205 字节）。
 > 所以上表的工时来自**官方写在盘名里的标注**，不是切片器的计算值；耗材克数同理没有。
@@ -430,10 +453,14 @@ ORCA 官方用 PLA（eSUN），正好是 A1 的强项。**别换 ABS/ASA**——
 `Prints-1100.3mf` → 机型选 `Bambu Lab A1 0.4 nozzle` → 选一个 A1 的 process 配置
 （如 `0.20mm Standard @BBL A1`）→ 重新切片。
 
-#### ⑥ 公差件：先用 0.4，不够再上 0.2
+#### ⑥ 喷嘴：官方工程就是 0.4，不用换
 
-A1 支持 0.2 喷嘴。但**先别急着换**——按 §3 的阶段 0 用 0.4 打样品干装，
-量出销孔/轴承孔实际偏多少，再决定是换 0.2 喷嘴还是扩孔/铰孔。
+`project_settings.config` 显示官方工程用 **0.4 喷嘴 + 0.16mm 层高**
+（`0.16mm High Quality @BBL P2S`）。盘名里的 `(0.2mm)`/`(0.16mm)` 是**层高**，
+不是喷嘴直径——**0.16mm 喷嘴这个规格根本不存在**。
+
+所以直接用 A1 自带的 0.4 喷嘴即可。若干装后发现销孔/轴承孔偏小，
+再考虑扩孔/铰孔或换 0.2 喷嘴（A1 支持 `Bambu Lab A1 0.2 nozzle` 配置）。
 v2.1 的卖点之一就是 "improved tolerances"，说明官方也在意这个。
 
 #### ⑦ 时间预期
