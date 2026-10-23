@@ -216,7 +216,9 @@ def build() -> Board:
     b.add('GND', [(8.0, 45.08), (XD_G, 45.08)], 1.2, 'B')
     b.add('GND', [(28.0, 39.08), (XD_G, 39.08)], 1.0, 'B')
     b.add('GND', [(28.0, 28.54), (XD_G, 28.54)], 1.0, 'B')
-    b.add('GND', [(XD_G, 18.16), (XD_G, 45.08)], TRUNK_W, 'B')
+    b.add('GND', [(XD_G, 12.0), (XD_G, 45.08)], TRUNK_W, 'B')
+    # 母干下界必须到最下一排(ry=12)—— 原先只到 18.16，第三排的 GND 桩悬空，
+    # 整排 GND 没接上。间距检查抓不到这种"没接"，是连通性检查揪出来的。
     for ry, xs in by_row.items():
         b.add('GND', [(XD_G, ry), (xs[0], ry)], 1.5, 'B')
 
@@ -329,6 +331,85 @@ def write_drill(path: Path, holes, plated: bool):
     path.write_text('\n'.join(out), encoding='ascii')
 
 
+# ---------------- 连通性检查 ----------------
+def connectivity_problems(b: Board) -> list[str]:
+    """按网做连通性：同一张网的所有焊盘必须落在同一个连通块里。
+
+    为什么必须有这一项：间距检查只能发现「离得太近」，发现不了「线没接上」。
+    实际踩到的例子 —— GND 母干原写到 y=18.16，而第三排的 GND 在 y=12，
+    三者互不相连，整排 GND 悬空，间距检查全绿。
+
+    规则：焊盘是 THT（两层都有），所以焊盘可与任一层走线相连；
+    走线与走线只在同层且点落在线段上时相连。
+    """
+    TOL = 0.05
+
+    def on_seg(p, a, c, tol=TOL):
+        ax, ay = a
+        cx, cy = c
+        px, py = p
+        dx, dy = cx - ax, cy - ay
+        l2 = dx * dx + dy * dy
+        if l2 == 0.0:
+            return math.hypot(px - ax, py - ay) <= tol
+        t = ((px - ax) * dx + (py - ay) * dy) / l2
+        if t < -0.001 or t > 1.001:
+            return False
+        t = max(0.0, min(1.0, t))
+        return math.hypot(px - (ax + t * dx), py - (ay + t * dy)) <= tol
+
+    out: list[str] = []
+    nets: dict[str, list[Pad]] = {}
+    for p in b.pads:
+        nets.setdefault(p.net, []).append(p)
+
+    for net, pads in nets.items():
+        traces = [t for t in b.traces if t.net == net and t.width > 0]
+        n, m = len(pads), len(traces)
+        parent = list(range(n + m))
+
+        def find(x: int) -> int:
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
+
+        def union(a: int, c_: int) -> None:
+            ra, rb = find(a), find(c_)
+            if ra != rb:
+                parent[ra] = rb
+
+        for i, p in enumerate(pads):
+            for j, t in enumerate(traces):
+                if any(on_seg((p.x, p.y), t.pts[k], t.pts[k + 1]) for k in range(len(t.pts) - 1)):
+                    union(i, n + j)
+
+        for j in range(m):
+            for k in range(j + 1, m):
+                if traces[j].layer != traces[k].layer:
+                    continue
+                hit = any(
+                    on_seg(a_, traces[k].pts[s], traces[k].pts[s + 1])
+                    for a_ in traces[j].pts for s in range(len(traces[k].pts) - 1)
+                ) or any(
+                    on_seg(a_, traces[j].pts[s], traces[j].pts[s + 1])
+                    for a_ in traces[k].pts for s in range(len(traces[j].pts) - 1)
+                )
+                if hit:
+                    union(n + j, n + k)
+
+        groups: dict[int, list[str]] = {}
+        for i in range(n):
+            groups.setdefault(find(i), []).append(f'{pads[i].ref}')
+        if len(groups) > 1:
+            detail = ' | '.join(
+                f'{len(v)}个({",".join(sorted(set(v))[:5])}…)'.replace(',…', '…')
+                for v in groups.values()
+            )
+            out.append(f'网 {net} 断成 {len(groups)} 块: {detail}')
+    return out
+
+
 # ---------------- 自检 ----------------
 def self_check(b: Board) -> list[str]:
     problems: list[str] = []
@@ -382,6 +463,8 @@ def self_check(b: Board) -> list[str]:
                 d = seg_pt((h.x, h.y), t.pts[k], t.pts[k + 1]) - h.dia / 2 - t.width / 2
                 if d < MIN_CLEAR:
                     problems.append(f'安装孔与走线过近 {d:.2f}  {h.label} 与 走线({t.net})')
+
+    problems.extend(connectivity_problems(b))
 
     # 丝印压到焊盘（丝印盖锡会脏，但不算废板；只提示）
     for poly in b.silk:
