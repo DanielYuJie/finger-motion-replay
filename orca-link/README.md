@@ -449,6 +449,54 @@ powershell -NoProfile -ExecutionPolicy Bypass -File run_stack.ps1 -Restart      
 
 各进程日志写在 `orca-link/logs/`（已 gitignore）。
 
+### 调电机：三层仿真，各模拟什么
+
+想"在电脑上调电机"时，先分清要测的是哪一层 —— 选错层会得到虚假的安心：
+
+| 层 | 工具（orca_core / orca_sim 自带） | 模拟什么 | 测不出什么 |
+|---|---|---|---|
+| **L3 物理** | `orca_sim` + MuJoCo | 关节动力学、重力、惯量、执行器力矩 | **腱绳与耦合**（模型 `ntendon=0, neq=0`，每个执行器直驱一个关节） |
+| **L2 手 API** | `MockOrcaHand`（`from orca_core.hardware_hand import MockOrcaHand`，配 `models/v2/orcahand-right`） | 整只手的关节接口、配置驱动的 ROM/方向 | 总线报文、寄存器、丢包 |
+| **L1 伺服/协议** | `MockFeetechClient` / `MockDynamixelClient` + `MockHandSerialLink` | **真实客户端的同一套 API 与同一张 HLS 寄存器表**，只把串口换成内存 | 动力学（电机"瞬间到位"） |
+
+**调「电机部分」应该用 L1**。`orca_core` 的这些 mock 不是另写的假实现 —— 它们继承
+`MotorClient`，走同一套接口和寄存器表，所以**在这一层调通的代码搬到真机上是同一份**。
+
+`servo_bench.py` 是把 L1 包成可直接跑的台架：
+
+```powershell
+cd orca-link
+python servo_bench.py                  # 全部演示（17 个 Feetech 电机）
+python servo_bench.py --demo limits    # 只看量程与截断
+python servo_bench.py --demo bus       # 只看总线、缺号
+python servo_bench.py --motor dynamixel
+```
+
+实测输出（`--count 17`，无需任何硬件）：
+
+```
+支持波特率: [1000000, 500000, 250000, 128000, 115200, 76800, 57600, 38400]
+增益（真机默认）: kp=32 ki=0 kd=32     default_profile: 2.356 rad/s, 10.0 rad/s²
+位置量程: (-6.2817, 0.0) rad = (-359.9°, 0.0°)
+  指令 +30.0° -> 回读 +0.0°     <-- 被量程夹住
+  指令 -90.0° -> 回读 -90.0°
+  指令 -400.0° -> 回读 -359.9°  <-- 被量程夹住
+```
+
+**这层能提前抓到的坑**（都是真机上会烧时间或烧件的）：
+
+- **一圈量程的符号约定**：HLS 原始值 0..360°、BIT15 作符号位，映射成 **0 到 −360°**。
+  照直写 `+15°` 会被夹成 0 —— 你只会看到"电机不动"，然后去怀疑接线。
+- `GOAL_SPEED = 0` 在 Feetech 上表示**停机**，Dynamixel 上才表示"不限速"。写错了会以为电机坏了。
+- 力矩使能顺序、模式寄存器（`HLS.MODE`：0 位置 / 1 速度 / 2 电流 / 3 PWM）。
+- 缺号：`absent_motor_ids()` 在接触硬件前就暴露 ID 没配对的电机。
+
+**L1 的已知局限**（别指望它）：`scan_for_motors` 未实现（mock 抛 `NotImplementedError`，
+真机上才有意义）；电机"瞬间到位"（`read_status_is_done_moving` 恒 `True`），不含到位过程
+与过冲 —— 那要看 L3。
+
+**推荐组合**：L1 调电机映射/量程/寄存器 → L3 看整手动作是否合理 → 真机。
+
 ### 其它行为特征
 
 - **前 30 帧重定向器返回 `None`**，是自动尺度标定期，机械手保持 `init_joints()` 姿态不动。
