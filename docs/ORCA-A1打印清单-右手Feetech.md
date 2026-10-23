@@ -3,6 +3,13 @@
 > 依据：官方排盘工程 `orca-link/prints/Prints-1100.3mf`（v2 Base，10 盘 / 117 件）。
 > 你选定的方案：**打印右手 · 舵机 Feetech · 机型 Bambu Lab A1**。
 > 本清单**不改动 3MF 文件**，全部操作在 Bambu Studio 界面里完成（路线 A）。
+>
+> ⚠️ **权威文档是 [`ORCA-3D打印建造方案.md`](ORCA-3D打印建造方案.md)** —— 那里有逐盘的
+> 精确零件清单、Gate G1 判据表与**实际打印进度**（首批零件已完成、机械骨架已干装）。
+> 本文件只是据此派生的「可勾选操作单」，若两者冲突以那份为准。
+>
+> 已知进展（截至远端 `89a0435`）：A1 首批零件打完；掌骨 + 4 指 + 拇指的机械骨架已干装，
+> 尚无腱绳与舵机。下一步是清支撑 → 查销/轴承压入配合 → 通 32 条腕骨 PTFE 通道。
 
 ---
 
@@ -30,15 +37,18 @@
 | **7** | 19 | Fingertips Touch (L & R)(0.16mm)(9.5h) | ⚠️ **删左手 3 件**，留 16 | PLA | 9.5h |
 | **8** | 4 | Plates + Hulls (OH Board) (0.2mm)(4.5h) | ✅ 保留 | PLA | 4.5h |
 | **9** | 1 | SidePlate **MULTICOLOR** (0.2mm)(1h) | ✅ 保留 | PLA | 1h |
-| **10** | 7 | **CNC parts (FDM can substitute)**(2.5h) | 🤔 自行决定 | PLA | 2.5h |
+| **10** | 7 | **CNC parts (FDM can substitute)**(2.5h) | ✅ 建议打（可打印替代版已含） | PLA | 2.5h |
 
 **盘 10 的 7 件含重复**（已核对 `model_settings.config`）：`FrankaConnector` ×1、
 **`SpoolHolder` ×4**、**`SpoolTensioner` ×2** —— 不是 7 个不同零件。
 
-这 7 件本来是机加工件，盘名直接写了 "FDM can substitute"。但你文档里记过：
-**`SpoolHolder` 在 v2.1 已被金属件取代**，仓库同时给了 `04_ForeArm/SpoolHolder.stl`（打印）
-与 `06_CNC/SpoolHolder_CNC.step`（机加工）。
-→ 走 Feetech + v2 Base 的话建议**先打**，等装配时再决定要不要换成金属件。
+这 7 件本来是机加工件，**但盘名原文就是 `CNC parts (FDM can substitute)`** ——
+官方已经把可打印替代版放进了工程，2.5h 就能打，**不是"必须机加工"**
+（这条曾被误判为不可选项，已在 `docs/ORCA-3D打印建造方案.md` 纠正）。
+
+需要注意 `SpoolHolder`：你文档里记过 **v2.1 已被金属件取代**，仓库同时给了
+`04_ForeArm/SpoolHolder.stl`（打印）与 `06_CNC/SpoolHolder_CNC.step`（机加工）。
+→ 走 Feetech + v2 Base 建议**先打**，装配时再决定要不要换金属件。
 
 ---
 
@@ -80,11 +90,18 @@ I-AP-R.stl / R-T-AP.stl / T-TP-R.stl   ← 留（右手对应件）
 
 ## 四、A1 专属注意
 
-- [ ] **喷嘴 0.4**（官方参数全按 0.4 调；用 0.2 既慢又易堵）
-- [ ] 官方预设是 `0.16mm High Quality @BBL P2S`，切到 A1 后确认层高/流量跟着变
+- [ ] **喷嘴用 A1 自带的 0.4，不要换**
+      盘名里的 `(0.2mm)` / `(0.16mm)` 是**层高，不是喷嘴直径**。
+      依据 `project_settings.config`：`nozzle_diameter = ["0.4"]`、`layer_height = 0.16`、
+      `print_settings_id = "0.16mm High Quality @BBL P2S"`；而且 **0.16mm 喷嘴这个规格并不存在**。
+      （这条曾被误判成"要换 0.2mm 喷嘴"，已在 `docs/ORCA-3D打印建造方案.md` 中纠正。）
+- [ ] 切到 A1 后确认层高/流量跟着变（官方工艺是 `0.16mm High Quality @BBL P2S`）
 - [ ] **TPU 分任务打**（盘 4、盘 5），外置料盘，别和 PLA 混在一盘
 - [ ] 盘 9 是多色（MULTICOLOR）：有 AMS 就多色，没有就单色打
 - [ ] 盘 4/5 是薄片皮肤件，注意首层附着；A1 无辅助风扇，大面积薄件留意翘边
+- [ ] 工时预期：官方盘名标的是**上限**。首个真实切片（P7，A1 + 0.4）
+      实测 19.60 m / 58.47 g / **6h47m**，而盘名写的是 9.5h。
+      所以那张约 49.5h 的总表按上限看待，右手子集会明显更少。
 
 ---
 
