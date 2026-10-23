@@ -363,6 +363,40 @@ git clone https://github.com/orcahand/orcahand_hardware.git   # 约 850 MB
 
 这是目前唯一一个有真实克数的盘（58.47 g）。其余盘需要各自切一次才能拿到准确值。
 
+#### ⚠️ 版本与"另存即改配置"的陷阱
+
+上游在 **2026-10-20** 发布过一版新 `Prints-1100.3mf`（提交 `9bd916d5` / merge `0da09ab`），
+比之前的 2026-10-10 版小了约 2 MB。我逐盘对比过**新旧两版**，结论是：
+
+- **盘数、盘名、每盘件数、官方工时全部不变**（10 盘 / 64+… 件数一致）→ 本节的盘表对两版都成立
+- 只改了 **文件名/变体**：
+  | 盘 | 旧名 | 新名 |
+  |---|---|---|
+  | P5 | `L-Carpals_Skin_TPU` | `carpals_core_l_skin` |
+  | P7 | `L-T-AP` | `T-AP-L` |
+  | **P8** | `FanCover_TwoFans` | **`FanCover_TwoFans_v2.1.1`** ← 这是真正的件修订 |
+  | P10 | `SpoolHolder` | `SpoolHolder.stl` |
+
+- **上游两版的 `project_settings` 都是正确的**（我逐字段核过）：
+  `printer_model: Bambu Lab P2S`、`nozzle_diameter: 0.4`、`layer_height: 0.16`、
+  `print_settings_id: 0.16mm High Quality @BBL P2S`、
+  `filament_settings_id: Generic PLA + Generic TPU ×3`、`sparse_infill: 15%`、`Textured PEI Plate`
+
+**所以"配置被改坏"不是文件本身的问题，而是 Bambu Studio 的行为**：
+一旦你在 A1 配置下打开工程并**另存**，它会把 `project_settings` 重写成当前机型/耗材，
+于是可能出现 `A1 + 0.2 喷嘴 + 0.10mm + 四个槽全是 PLA`、**TPU 指派丢失**的状态。
+后果很实际：直接切 P4/P5 会把**皮肤打成 PLA**，而且按 PLA 的 120–150 mm/s 跑
+（TPU 需要压到 ~3.2 mm³/s）。
+
+对策（三选一）：
+
+1. **别另存**——打开 → 换机型 → 直接切片 → 只导出 G-code，不回写工程文件
+2. 必须另存时，**逐盘手动确认耗材槽位**：P4/P5 要指到 TPU，其余指到 PLA
+3. 留一份**原始工程文件**做对照。仓库里 `orca-link/prints/Prints-1100.3mf` 就是
+   我按上游 blob 校验过的原始版（blob `912effa9`），另存坏了可以拿它还原
+
+> 打硅胶模具不要用 `Prints-1100.3mf`，要用 `SiliconeMolds-1100.3mf`（配置是 A1 / 0.4 / 0.20）。
+
 > ⚠️ **这个 3MF 没有切片数据**（`Metadata/slice_info.config` 只有 205 字节）。
 > 所以上表的工时来自**官方写在盘名里的标注**，不是切片器的计算值；耗材克数同理没有。
 > 想要精确到克，得自己切一次。
