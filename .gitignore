@@ -26,6 +26,8 @@ orca-link/proto_gen/
 orca-link/vendor/
 orca-link/sim_frames*/
 orca-link/live_anim/
+# 3D 演示：转台 GIF 与拼图重复，只保留拼图
+orca-link/docs/orca-blender-turntable.gif
 orca-link/docs/parts/
 # 上游官方排盘工程（orcahand_hardware 下载，约 31MB，不入库）
 orca-link/prints/
