@@ -81,6 +81,39 @@ port         = auto
 > 而 `orca_core/hardware/feetech_client.py` 里写的是 `supports_multi_turn = False`。
 > 也就是说**多圈是软件上被关掉的，不是硬件不支持**——当初我说「Feetech 本来就不支持多圈」
 > 不准确。真要开多圈，改的是客户端这个类属性 + 对应的位置换算，不是换硬件。
+### 对照 Dynamixel（官方 ROBOTIS e-manual）
+
+| 项 | **XC330-T288-T**（指） | **HLS3915**（指） | **XC430-T240BB-T**（腕） | **HLS3930**（腕） |
+|---|---|---|---|---|
+| 尺寸 W×H×D | **20.0 × 34.0 × 26.0 mm** | A20/B34/C23 mm | **28.5 × 46.5 × 34 mm** | A45.22/B24.72/C35 mm |
+| 重量 | **23 g** | （未抓到） | **65 g** | （未抓到） |
+| 堵转扭矩 | **0.76 N·m** @9.0 V | **14.2 kg·cm ≈ 1.39 N·m** @12 V | **1.4 N·m** @9.0 V | **35 kg·cm ≈ 3.43 N·m** @12 V |
+| 空载转速 | 52 rpm @9.0 V | （未抓到） | 52 rpm @9.0 V | （未抓到） |
+| 减速比 | 288.35 : 1 | 1/320 | 245.22 : 1 | 1/345 |
+| 电机 | Coreless DC | 空心杯 Coreless | Coreless | Core Motor |
+| 输入电压 | 6.5 ~ 12.0 V（推荐 11.1 V） | 12 V | 6.5 ~ 14.8 V（推荐 **12.0 V**） | 12 V |
+| 分辨率 | 4096 pulse/rev | 12 位磁编码 | 4096 | 12 位磁编码 |
+| 型号号 | **1220** | 6922 / 5130 | **1080** | 4106 |
+| 待机电流 | 17 mA | — | 46 mA | — |
+
+**三个值得注意的点：**
+
+1. **Feetech 的扭矩反而明显更大**：手指 1.39 vs 0.76 N·m（约 1.8×），手腕 3.43 vs 1.4 N·m（约 2.4×）。
+   所以 Feetech 不只是"便宜替代"，在扭矩上是**升级**。（注意 Dynamixel 的堵转扭矩是在 **9.0 V** 下标的，
+   12 V 下会更高，但量级差仍在。）
+2. **XC430-T240BB-T 没有 Goal Current 寄存器**（控制表里只有 Max/Min Voltage、Torque Enable、
+   Present Input Voltage）。这就是 `orca_core` 里 `MODELS_WITHOUT_CURRENT_CONTROL = frozenset({1080})`
+   的来源 —— **Dynamixel 的腕做不了电流控制**。而 Feetech 有恒力模式（模式 2，目标扭矩在 44 号地址）。
+   对"靠堵转电流做硬限位标定"这件事，Feetech 反而更合适。
+3. **尺寸是两套腔位**：XC330 与 HLS3915 在 W/H 上一致（20×34），深度 26 vs 23 mm 差 3 mm；
+   但 XC430（28.5×46.5×34）与 HLS3930（45.22×24.72×35）**长宽几乎互换**，
+   所以 P1/P2 两个塔身必须分别打印，不能混装。
+
+**orca_core 对 Dynamixel 的固定参数**（`dynamixel_client.py`）：
+`current_scale_ma = 1.0`、`max_current_ma = 910`、`default_max_current_ma = 300`、
+`default_calibration_current_ma = 300`、`factory_default_baudrate = 57600`、
+可用波特率 `1 Mbps / 3 Mbps`、`RETURN_DELAY_TIME_US = 20`。
+其 `no_load_speed_rad_s = 70 rpm` 正是 XC330 在 12 V 下的值（手册 52 rpm @9 V 折算）。
 ## 二、仓库里唯一的一块 PCB：电机接线板（被动件）
 
 `orcahand_hardware/orca_v2/electronics/` 只有这一块板（v1 的完全一样）：
