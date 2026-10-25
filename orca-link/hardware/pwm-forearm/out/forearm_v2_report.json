@@ -1,0 +1,17 @@
+{
+  "watertight": true,
+  "winding_consistent": true,
+  "verts": 8604,
+  "faces": 17556,
+  "bbox_mm": [
+    227.2,
+    125.0,
+    41.0
+  ],
+  "volume_mm3": 215297.6,
+  "servo_cells": 17,
+  "screw_holes": 68,
+  "shaft_holes": "17/17",
+  "mount_holes": "68/68",
+  "all_holes_ok": true
+}

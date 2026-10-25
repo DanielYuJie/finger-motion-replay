@@ -12,9 +12,12 @@ import os
 import bpy
 from mathutils import Vector
 
+import sys
 BASE = os.path.dirname(os.path.abspath(__file__))
-STL = os.path.join(BASE, "out", "forearm_v1.stl")
 OUT = os.path.join(BASE, "out")
+_argv = [a for a in sys.argv[sys.argv.index("--") + 1:]] if "--" in sys.argv else []
+STEM = _argv[0] if _argv else "forearm_v1"
+STL = os.path.join(OUT, STEM + ".stl")
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_mesh.stl(filepath=STL)
@@ -85,6 +88,6 @@ for name, az, el in views:
     # to_track_quat aligns -Z with the given vector; camera sits at d*dist
     # and must LOOK BACK toward the origin -> use -d, not d.
     cam.rotation_euler = (-d).to_track_quat("-Z", "Y").to_euler()
-    sc.render.filepath = os.path.join(OUT, "forearm_v1_%s.png" % name)
+    sc.render.filepath = os.path.join(OUT, STEM + "_%s.png" % name)
     bpy.ops.render.render(write_still=True)
     print("rendered %s" % name)
