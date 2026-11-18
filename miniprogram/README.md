@@ -289,3 +289,52 @@ iPhone 性能预期：VisionKit 为系统能力、推理开销低，帧率主要
 - 日志（最近 10 条）
 
 标定与视觉驱动共用同一份 `FINGERS`（`core/ble-hand.js`），改完立刻对采集页生效。
+
+## 手部识别优化（2026-11）
+
+识别链路仍是 VisionKit `VKSession`（`track.hand.mode=1`，2D 21 点），但解算层做了三处改造，
+针对的是「五指张开、机械手某几根还弯着」这类残差问题。
+
+### 1) 3D 关键点（可选增强，微信 ≥8.1.0）
+
+`session.start` 成功后调 `session.update3DMode({ open3d: true })`，失败静默退回 2D（老机型不受影响）。
+开启后若该版 SDK 直接返回 21 点 `points3d`，`pages/capture/index.js` 的 `mergeDepth()` 会把 z 合进 2D 点，
+`core/hand.js` 的角度公式自动走 3D 分支。
+
+依据：[微信官方 · 人手检测](https://developers.weixin.qq.com/miniprogram/dev/framework/open-ability/visionkit/hand.html)
+（摄像头实时模式在 `updateAnchors` 内调 `update3DMode`，输出 `points3d` / `camExtArray` / `camIntArray`）。
+
+> 官方 3D 点采用 MANO-16 点定义，与 2D 的 21 点编号体系不同，**不做强行套映射**；
+> 只有当 SDK 直接给出 21 点 3D 时才启用，否则保持 2D，避免映射错导致角度整体错位。
+
+### 2) 双度量融合（角度 + 路径曲率比）
+
+`core/hand.js` 的 `computeFingerAngles()` 现在输出 `flex = 0.6 × 关节角法 + 0.4 × curl 比值`：
+
+- 关节角法：三点夹角 → 屈曲角，看的是单个关节的局部弯曲；
+- curl 比值：`直线(根→尖) / 折线(根→P1→P2→尖)`，看的是整根手指的形态，与手离镜头远近无关。
+
+拇指的 CMC 关节权重降到 0.35（该关节几乎不能屈，且腕→CMC 距离短、噪声大）。
+
+### 3) 软死区 + 5% 量化
+
+`sharpenFlex()`：`flex ≤ 8` 归一为 0，`≥ 92` 归一为 100，中间线性拉伸，再按 5% 步进取整。
+效果是「张开就真的输出 0」，同时舵机不会在阈值附近持续微动。UI 读数与推给机械手的是同一份值。
+
+### 4) 置信度门槛
+
+`anchor.confidence < 0.4` 的帧按「没识别到手」处理，交给 `PresenceGate` 走宽限期，
+不让劣质点被解成角度直接推给舵机。
+
+### 验证
+
+`miniprogram/test/` 之外本轮用合成数据跑了一遍（脚本见 `docs/手部识别优化.md`）：
+
+| 场景 | 结果 |
+|---|---|
+| 五指完全伸直 | 死区后 五指全 0 |
+| 食指弯曲 90° | 45 |
+| 手指朝镜头弯（2D 投影几乎不变） | 2D 判 21 → 3D 判 43 |
+
+> 网页端 `app.js` 里的 `computeFingerAngles()` 是**独立实现**，本轮未同步改动。
+> 如需两端一致，把 `miniprogram/core/hand.js` 的算法搬过去即可。

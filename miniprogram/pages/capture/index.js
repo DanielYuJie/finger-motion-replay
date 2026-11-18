@@ -44,6 +44,10 @@ var POINTS_ARE_PIXELS = false;
 //   · 推送频率 10Hz（100ms）足够；桥接侧 command_hz 是 30Hz，会自行插值
 var BRIDGE_INTERVAL_MS = 100;
 
+// 关键点置信度门槛。低于此值视作「这一帧没识别到手」，
+// 让 PresenceGate 走宽限期，而不是把一个劣质点解成角度去驱舵机。
+var MIN_CONF = 0.4;
+
 var FINGER_LABELS = ['全部', '食指', '中指', '无名指', '小指', '拇指'];
 var FINGER_KEYS = [null, 'index', 'middle', 'ring', 'pinky', 'thumb'];
 
@@ -59,6 +63,26 @@ function buildCards() {
       })
     };
   });
+}
+
+/**
+ * 把 3D 关键点的 z 合进 2D 点。
+ * 官方 points3d 的单个点既可能是 {x,y,z}，也可能是 [x,y,z]，两种都兼容。
+ * 合成后 normalizePoints 会保留 z，computeFingerAngles 的向量点积自动带上深度，
+ * 从而消除「手掌正对镜头时手指朝镜头弯曲、2D 投影几乎不变」造成的误判。
+ */
+function mergeDepth(points, points3d) {
+  var out = new Array(points.length);
+  for (var i = 0; i < points.length; i++) {
+    var p = points[i];
+    var q = points3d[i] || {};
+    var z;
+    if (typeof q.z === 'number') z = q.z;
+    else if (q.length === 3) z = Number(q[2]);
+    else z = 0;
+    out[i] = { x: p.x, y: p.y, z: isFinite(z) ? z : 0 };
+  }
+  return out;
 }
 
 function windowInfo() {
@@ -296,14 +320,40 @@ Page({
       self._gfxFrames = 0;
       self._gfxNull = 0;
       self._fpsAt = 0;
+
+      // 尝试开启人手 3D 关键点（微信 ≥8.1.0 才有）。失败就静默退回 2D：
+      // 老机型/老基础库不该因此报错，功能降级但不能不可用。
+      self._3d = self.enable3D();
+
       self.setData({
         running: true,
-        status: '采集中 · 识别中',
+        status: '采集中 · 识别中' + (self._3d ? ' · 3D' : ''),
         statusState: 'live',
         tips: []
       });
       self.startRenderLoop();
     });
+  },
+
+  /**
+   * 开启人手 3D 关键点（微信 ≥8.1.0）。
+   * 官方文档：摄像头实时模式在 2D 基础上调 session.update3DMode({open3d:true})，
+   * 之后 anchor 会额外带 points3d / camExtArray / camIntArray。
+   * 能开就开：3D 角度不受手掌正对镜头时的透视压缩影响，这是精度最大的一档提升。
+   * 老机型没有这个方法就静默降级，不影响 2D 主链路。
+   */
+  enable3D: function () {
+    var s = this.session;
+    if (!s) return false;
+    try {
+      if (typeof s.update3DMode !== 'function') return false;
+      s.update3DMode({ open3d: true });
+      return true;
+    } catch (e) {
+      console.warn('[VK] update3DMode 不可用，退回 2D：' +
+        (e && e.message ? e.message : e));
+      return false;
+    }
   },
 
   /** 逐帧：取 VK 帧 → 画相机 + 骨架。官方示例用 session.requestAnimationFrame 驱动。 */
@@ -405,7 +455,17 @@ Page({
     this.countFrame(now);
 
     var a = anchors && anchors[0];
-    var raw = (a && a.points && a.points.length >= 21) ? a.points : null;
+    var raw = null;
+    if (a && a.points && a.points.length >= 21) {
+      // 置信度门槛：低质量帧按「没识别到手」处理，交给 PresenceGate 走宽限期，
+      // 不让一个劣质点被解成角度、直接推给舵机。
+      var conf = (typeof a.confidence === 'number') ? a.confidence : 1;
+      if (conf >= MIN_CONF) {
+        raw = a.points;
+        // 开了 open3d 且这一版 SDK 直接给 21 点 3D 坐标时，把 z 合进来
+        if (a.points3d && a.points3d.length >= 21) raw = mergeDepth(a.points, a.points3d);
+      }
+    }
 
     var mode = this.gate.update(!!raw, now);
 
@@ -435,6 +495,9 @@ Page({
     var norm = handCore.normalizePoints(raw, 0, 0, POINTS_ARE_PIXELS);
     var smooth = this.lm.filter(norm, now);
     var angles = this.ang.filter(handCore.computeFingerAngles(smooth), now);
+    // 软死区 + 5% 量化：吃掉伸直时的角度残差，让「张开」真的输出 0，
+    // 同时避免舵机在阈值附近持续微动。UI 读数与推给机械手的值是同一份。
+    handCore.sharpenFlex(angles);
 
     if (this.glv) this.glv.setPoints(smooth, this.focusTipIndex());
     this.pushUI(angles, raw.length, now);
