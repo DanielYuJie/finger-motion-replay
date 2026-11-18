@@ -111,6 +111,15 @@
   </div>
 
   <div class="card">
+    <h2>03b 作者手势预设（复刻 XiaochuHand.exe）</h2>
+    <div class="row" id="presetBox"></div>
+    <div class="note">
+      作者的实现：每指 0–100，公式 angle = round(v × 1.8)，五指共用同一映射，没有每指特判。
+      0° 全伸直、180° 全握拳 —— 也就是说他的机械手装配时把每根舵机的 0° 都对齐到了伸直位。
+    </div>
+  </div>
+
+  <div class="card">
     <h2>04 单条指令</h2>
     <div class="row">
       <input type="text" id="cmdInput" value="servo_0=90" placeholder="例如 servo_0=90 或 fist" />
@@ -349,6 +358,25 @@
       log("TX " + cmd + (ok ? "  OK" : "  失败"));
     });
   });
+
+  (function buildPresets() {
+    var box = document.getElementById("presetBox");
+    if (!box || !ble.PRESET_NAMES) return;
+    ble.PRESET_NAMES.forEach(function (name) {
+      var b = document.createElement("button");
+      b.textContent = name;
+      b.addEventListener("click", function () {
+        if (!ble.isConnected()) {
+          log("未连接，先连接设备");
+          return;
+        }
+        ble.setEnabled(true);
+        ble.sendPreset(name);
+        log("预设 " + name + " → flex [" + ble.PRESET_FLEX[name].join(",") + "]");
+      });
+      box.appendChild(b);
+    });
+  })();
 
   refreshButtons();
   renderCal();

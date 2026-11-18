@@ -24,6 +24,24 @@
   const CHANGE_EPS = 1;         // 角度变化 <= 1° 不重复写
   const CAL_KEY = "bleHandCal_v1";
 
+  // 复刻作者上位机 XiaochuHand.exe 的 PRESET_ANGLES（反编译自 main.pyc）
+  // 每指 0-100：0=伸直，100=握拳；顺序 = 拇指/食指/中指/无名指/小指
+  // 作者公式：angle = round(v * 1.8)，五指同一映射，无每指特判
+  const PRESET_FLEX = {
+    five:    [0,   0,   0,   0,   0  ],
+    four:    [100, 0,   0,   0,   0  ],
+    three:   [100, 0,   0,   0,   100],
+    two:     [100, 0,   0,   100, 100],
+    one:     [100, 0,   100, 100, 100],
+    ok:      [0,   100, 100, 100, 100],
+    rock:    [100, 0,   100, 100, 0  ],
+    love:    [0,   0,   100, 100, 0  ],
+    fist:    [100, 100, 100, 100, 100],
+    scratch: [0,   100, 0,   0,   0  ],
+    come:    [0,   0,   100, 0,   0  ],
+  };
+  const PRESET_NAMES = ["five", "four", "three", "two", "one", "ok", "rock", "love", "fist", "scratch", "come"];
+
   function clampAngle(v) {
     return Math.max(0, Math.min(180, Math.round(Number(v) || 0)));
   }
@@ -183,11 +201,25 @@
     }
   }
 
+  function sendPreset(name) {
+    const vals = PRESET_FLEX[name];
+    if (!vals) return false;
+    const frame = {};
+    for (let i = 0; i < FINGERS.length; i += 1) {
+      frame[FINGERS[i].name] = { flex: vals[i] };
+    }
+    send(frame);
+    return true;
+  }
+
   window.BleHand = {
     connect: connect,
     disconnect: disconnect,
     send: send,
     sendRaw: writeText,
+    sendPreset: sendPreset,
+    PRESET_FLEX: PRESET_FLEX,
+    PRESET_NAMES: PRESET_NAMES,
     setEnabled: function (v) { enabled = !!v; },
     isEnabled: function () { return enabled; },
     isConnected: function () { return !!characteristic; },
