@@ -272,3 +272,20 @@ iPhone 性能预期：VisionKit 为系统能力、推理开销低，帧率主要
 界面沿用了网页端的设计令牌（`app.wxss` 里那套 CSS 变量直接搬自
 [`../tokens.css`](../tokens.css)）：同一个深色「应用」主题、同一组品牌铜色与功能蓝、
 同样的刻度条与环形表语言（环表改用 canvas 画弧，不依赖 CSS 渐变）。
+
+## 上位机页面（pages/pad）
+
+对应网页版 `hand-pad.html` 与作者 `XiaochuHand.exe` 的功能，用于不依赖摄像头的手动控制与现场标定。
+
+入口：采集主端的「上位机（手动控制 / 标定）」按钮 → `wx.navigateTo('/pages/pad/index')`。
+
+功能：
+
+- 连接 / 断开 `xiaochu`
+- 11 个手势预设（与作者 `PRESET_ANGLES` 完全一致）
+- 五指滑杆 0–100，右侧实时显示换算角度
+- 自定义指令 `servo_<通道>=<角度>`
+- 标定：每指「伸直 / 握拳」角度输入 + 试发 + 应用 / 恢复默认（写入 `wx.setStorageSync('bleHandCal_v2')`）
+- 日志（最近 10 条）
+
+标定与视觉驱动共用同一份 `FINGERS`（`core/ble-hand.js`），改完立刻对采集页生效。

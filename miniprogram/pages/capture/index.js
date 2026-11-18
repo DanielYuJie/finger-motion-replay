@@ -602,6 +602,10 @@ Page({
 
   /* ---------------- BLE 直连机械手 ---------------- */
 
+  onOpenPad: function () {
+    wx.navigateTo({ url: '/pages/pad/index' });
+  },
+
   onBleConnect: function () {
     var self = this;
     if (!this.ble) return;

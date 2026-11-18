@@ -112,6 +112,11 @@
       <text class="bridge-status">{{bleStatus}}</text>
     </view>
 
+    <view class="row">
+      <text class="row-label">上位机（手动控制 / 标定）</text>
+      <button class="btn ble-btn" size="mini" bindtap="onOpenPad">打开</button>
+    </view>
+
     <view class="actions">
       <button class="btn primary" bindtap="onStart" disabled="{{running}}">开启摄像头</button>
       <button class="btn" bindtap="onStop" disabled="{{!running}}">关闭</button>

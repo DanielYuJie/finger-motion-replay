@@ -34,6 +34,63 @@ var SEND_INTERVAL_MS = 100;
 var CHANGE_EPS = 1;
 var SCAN_TIMEOUT_MS = 20000;
 
+/* ---------------- 标定（逐指 伸直/握拳 角度） ---------------- */
+
+var CAL_KEY = 'bleHandCal_v2';
+
+var DEFAULT_FINGERS = FINGERS.map(function (f) {
+  return { name: f.name, label: f.label, ch: f.ch, open: f.open, closed: f.closed };
+});
+
+function clampAngle(v) {
+  var n = Math.round(Number(v));
+  if (!isFinite(n)) return 0;
+  return Math.max(0, Math.min(180, n));
+}
+
+function applyCalibration(cal) {
+  if (!cal) return;
+  for (var i = 0; i < FINGERS.length; i++) {
+    var f = FINGERS[i];
+    var c = cal[f.name];
+    if (!c) continue;
+    if (c.open !== undefined) f.open = clampAngle(c.open);
+    if (c.closed !== undefined) f.closed = clampAngle(c.closed);
+  }
+}
+
+function getCalibration() {
+  var out = {};
+  for (var i = 0; i < FINGERS.length; i++) {
+    var f = FINGERS[i];
+    out[f.name] = { open: f.open, closed: f.closed };
+  }
+  return out;
+}
+
+function setCalibration(cal, persist) {
+  applyCalibration(cal);
+  if (persist === false) return;
+  try { wx.setStorageSync(CAL_KEY, getCalibration()); } catch (e) { /* 忽略 */ }
+}
+
+function resetCalibration() {
+  try { wx.removeStorageSync(CAL_KEY); } catch (e) { /* 忽略 */ }
+  for (var i = 0; i < FINGERS.length; i++) {
+    FINGERS[i].open = DEFAULT_FINGERS[i].open;
+    FINGERS[i].closed = DEFAULT_FINGERS[i].closed;
+  }
+}
+
+(function loadCalibration() {
+  try {
+    if (typeof wx === 'undefined' || typeof wx.getStorageSync !== 'function') return;
+    var raw = wx.getStorageSync(CAL_KEY);
+    if (!raw) return;
+    applyCalibration(typeof raw === 'string' ? JSON.parse(raw) : raw);
+  } catch (e) { /* 忽略 */ }
+})();
+
 function sameUuid(a, b) {
   return String(a || '').toLowerCase() === String(b || '').toLowerCase();
 }
@@ -387,6 +444,9 @@ function createBleHand(opts) {
     isConnected: function () { return !!charId; },
     flexToAngle: flexToAngle,
     FINGERS: FINGERS,
+    setCalibration: setCalibration,
+    getCalibration: getCalibration,
+    resetCalibration: resetCalibration,
     destroy: function () {
       disconnect();
       if (deviceFoundHandler) {
@@ -406,6 +466,10 @@ module.exports = {
   createBleHand: createBleHand,
   flexToAngle: flexToAngle,
   FINGERS: FINGERS,
+  DEFAULT_FINGERS: DEFAULT_FINGERS,
+  setCalibration: setCalibration,
+  getCalibration: getCalibration,
+  resetCalibration: resetCalibration,
   DEVICE_NAME: DEVICE_NAME,
   SERVICE_UUID: SERVICE_UUID,
   WRITE_UUID: WRITE_UUID

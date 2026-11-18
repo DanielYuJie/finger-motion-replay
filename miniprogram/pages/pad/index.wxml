@@ -1,0 +1,133 @@
+<!-- pages/pad/index.wxml -->
+<view class="pad">
+
+  <view class="statusbar">
+    <view class="brand-text">
+      <text class="brand-title">机械手上位机</text>
+      <text class="brand-sub">BLE 直连 · 与 XiaochuHand 同一套指令</text>
+    </view>
+    <view class="status {{statusKind === 'ok' ? 'status--live' : (statusKind === 'err' ? 'status--error' : (statusKind === 'wait' ? 'status--loading' : ''))}}">
+      <view class="dot"></view>
+      <text>{{status}}</text>
+    </view>
+  </view>
+
+  <!-- 连接 -->
+  <view class="pane">
+    <view class="pane-head"><view class="tick"></view><text class="pane-title">连接</text></view>
+    <view class="actions">
+      <button class="btn primary" bindtap="onConnect" disabled="{{connected}}">连接机械手</button>
+      <button class="btn" bindtap="onDisconnect" disabled="{{!connected}}">断开</button>
+    </view>
+    <view class="row">
+      <text class="row-label">设备名</text>
+      <text class="bridge-status">xiaochu</text>
+    </view>
+  </view>
+
+  <!-- 预设 -->
+  <view class="pane">
+    <view class="pane-head"><view class="tick"></view><text class="pane-title">手势预设</text></view>
+    <view class="preset-grid">
+      <button
+        class="preset"
+        wx:for="{{presets}}"
+        wx:key="name"
+        data-name="{{item.name}}"
+        bindtap="onPreset"
+      >
+        <text class="preset-zh">{{item.zh}}</text>
+        <text class="preset-en">{{item.name}}</text>
+      </button>
+    </view>
+  </view>
+
+  <!-- 手指控制 -->
+  <view class="pane">
+    <view class="pane-head"><view class="tick"></view><text class="pane-title">手指控制（0–100 → 角度）</text></view>
+    <view class="finger-row" wx:for="{{fingers}}" wx:key="name">
+      <text class="finger-name">{{item.label}}</text>
+      <slider
+        class="finger-slider"
+        min="0"
+        max="100"
+        step="1"
+        value="{{item.flex}}"
+        data-name="{{item.name}}"
+        bindchanging="onSlider"
+        bindchange="onSlider"
+        activeColor="#3d9cf0"
+        backgroundColor="rgba(255,255,255,0.12)"
+        block-size="20"
+      />
+      <text class="finger-val">{{item.flex}} → {{item.angle}}°</text>
+    </view>
+  </view>
+
+  <!-- 自定义指令 -->
+  <view class="pane">
+    <view class="pane-head"><view class="tick"></view><text class="pane-title">自定义指令</text></view>
+    <view class="cmd-row">
+      <input
+        class="cmd-input"
+        value="{{customText}}"
+        placeholder="servo_0=90 或 fist"
+        placeholder-class="ph"
+        bindinput="onCustomInput"
+      />
+      <button class="btn primary" size="mini" bindtap="onCustomSend">发送</button>
+    </view>
+    <text class="foot-hint">格式 servo_&lt;通道&gt;=&lt;角度&gt;（通道 0–4，角度 0–180）</text>
+  </view>
+
+  <!-- 标定 -->
+  <view class="pane">
+    <view class="pane-head"><view class="tick"></view><text class="pane-title">标定（伸直 / 握拳）</text></view>
+
+    <view class="cal-row" wx:for="{{cals}}" wx:key="name">
+      <text class="cal-name">{{item.label}}</text>
+      <view class="cal-fields">
+        <view class="cal-item">
+          <text class="cal-tag">伸直</text>
+          <input
+            class="cal-input"
+            type="number"
+            value="{{item.open}}"
+            data-name="{{item.name}}"
+            data-prop="open"
+            bindinput="onCalInput"
+          />
+          <button class="btn tiny" data-name="{{item.name}}" data-prop="open" bindtap="onTestAngle">试发</button>
+        </view>
+        <view class="cal-item">
+          <text class="cal-tag">握拳</text>
+          <input
+            class="cal-input"
+            type="number"
+            value="{{item.closed}}"
+            data-name="{{item.name}}"
+            data-prop="closed"
+            bindinput="onCalInput"
+          />
+          <button class="btn tiny" data-name="{{item.name}}" data-prop="closed" bindtap="onTestAngle">试发</button>
+        </view>
+      </view>
+    </view>
+
+    <view class="actions">
+      <button class="btn primary" bindtap="onApplyCal">应用标定</button>
+      <button class="btn" bindtap="onResetCal">恢复默认</button>
+    </view>
+    <text class="foot-hint">试发会直接写舵机；手指真伸直的角度填「伸直」，真握拳的填「握拳」，再应用。</text>
+  </view>
+
+  <!-- 日志 -->
+  <view class="pane">
+    <view class="pane-head"><view class="tick"></view><text class="pane-title">日志</text></view>
+    <view class="log">
+      <text class="log-line" wx:for="{{logs}}" wx:key="*this">{{item}}</text>
+      <text class="log-empty" wx:if="{{logs.length === 0}}">等待操作…</text>
+    </view>
+  </view>
+
+</view>
