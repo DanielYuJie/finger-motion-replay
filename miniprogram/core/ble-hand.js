@@ -24,9 +24,10 @@ var WRITE_UUID = '39dea685-a63e-44b2-8819-9a202581f8fe';
 var FINGERS = [
   { name: 'thumb',  label: '拇指',   ch: 0, open: 30,  closed: 180 },
   { name: 'index',  label: '食指',   ch: 1, open: 10,  closed: 180 },
-  { name: 'middle', label: '中指',   ch: 2, open: 180, closed: 0   },
+  // 实测修正：中指、小指与作者装配方向相反（作者固件为 180/0 与 180/35）
+  { name: 'middle', label: '中指',   ch: 2, open: 0,   closed: 180 },
   { name: 'ring',   label: '无名指', ch: 3, open: 0,   closed: 180 },
-  { name: 'pinky',  label: '小指',   ch: 4, open: 180, closed: 35  }
+  { name: 'pinky',  label: '小指',   ch: 4, open: 35,  closed: 180 }
 ];
 
 var SEND_INTERVAL_MS = 100;

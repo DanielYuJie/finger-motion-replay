@@ -10,19 +10,19 @@
   const SERVICE_UUID = "89d60870-9908-4472-8f8c-e5b3e6573cd1";
   const WRITE_UUID = "39dea685-a63e-44b2-8819-9a202581f8fe";
 
-  // 与固件 setup() 的标定表一致：open=伸直位置，closed=握拳位置
-  // 走 servo_i=angle 直发，绕开固件归一化层的 direction bug
+  // 实测修正版：中指、小指与作者的装配方向相反，伸直/握拳对调
+  // （作者固件 setup() 里是 middle 180/0、pinky 180/35，那套只适用于作者的装配）
   const FINGERS = [
     { name: "thumb",  label: "拇指",   ch: 0, open: 30,  closed: 180 },
     { name: "index",  label: "食指",   ch: 1, open: 10,  closed: 180 },
-    { name: "middle", label: "中指",   ch: 2, open: 180, closed: 0   },
+    { name: "middle", label: "中指",   ch: 2, open: 0,   closed: 180 },
     { name: "ring",   label: "无名指", ch: 3, open: 0,   closed: 180 },
-    { name: "pinky",  label: "小指",   ch: 4, open: 180, closed: 35  },
+    { name: "pinky",  label: "小指",   ch: 4, open: 35,  closed: 180 },
   ];
 
   const SEND_INTERVAL_MS = 100; // 10 Hz，避开 30 Hz 视觉帧写入压力
   const CHANGE_EPS = 1;         // 角度变化 <= 1° 不重复写
-  const CAL_KEY = "bleHandCal_v1";
+  const CAL_KEY = "bleHandCal_v2"; // v2：中指/小指方向修正，旧版标定不再沿用
 
   // 复刻作者上位机 XiaochuHand.exe 的 PRESET_ANGLES（反编译自 main.pyc）
   // 每指 0-100：0=伸直，100=握拳；顺序 = 拇指/食指/中指/无名指/小指
