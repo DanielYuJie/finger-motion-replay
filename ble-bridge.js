@@ -69,6 +69,7 @@
   let characteristic = null;
   let enabled = false;
   let statusCb = null;
+  let deviceNameFilter = DEVICE_NAME;
 
   let latest = null;
   let hasPending = false;
@@ -114,13 +115,13 @@
       throw new Error("浏览器不支持 Web Bluetooth，请用桌面版 Chrome / Edge 并通过 localhost 打开");
     }
     if (characteristic && device && device.gatt && device.gatt.connected) {
-      setStatus("已连接 " + (device.name || DEVICE_NAME), "ok");
+      setStatus("已连接 " + (device.name || deviceNameFilter), "ok");
       return true;
     }
 
     setStatus("搜索设备…", "wait");
     device = await navigator.bluetooth.requestDevice({
-      filters: [{ namePrefix: DEVICE_NAME }],
+      filters: [{ namePrefix: deviceNameFilter }],
       optionalServices: [SERVICE_UUID],
     });
     device.addEventListener("gattserverdisconnected", onDisconnected);
@@ -132,7 +133,7 @@
 
     lastWritten = {};
     stats = { frames: 0, writes: 0, errors: 0 };
-    setStatus("已连接 " + (device.name || DEVICE_NAME), "ok");
+    setStatus("已连接 " + (device.name || deviceNameFilter), "ok");
     return true;
   }
 
@@ -226,6 +227,11 @@
     onStatus: function (cb) { statusCb = cb; },
     flexToAngle: flexToAngle,
     FINGERS: FINGERS,
+    setDeviceName: function (name) {
+      const v = String(name || "").trim();
+      deviceNameFilter = v || DEVICE_NAME;
+    },
+    getDeviceName: function () { return deviceNameFilter; },
     getStats: function () { return Object.assign({}, stats); },
     supports: function () { return !!navigator.bluetooth; },
     setCalibration: function (cal, persist) {

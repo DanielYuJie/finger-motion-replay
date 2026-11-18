@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>机械手上位机 · 网页版</title>
+<style>
+  :root {
+    --bg: #f4f3ee; --card: #ffffff; --line: #e4e3dd;
+    --text: #1a1b1c; --sub: #6b7280;
+    --accent: #8bc8ea; --ok: #52c41a; --err: #ea6668; --warn: #faad14;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 20px 16px 48px; background: var(--bg); color: var(--text);
+    font: 14px/1.55 'Roboto', 'PingFang SC', 'Segoe UI', Arial, sans-serif;
+    -webkit-text-size-adjust: 100%; overflow-x: hidden;
+  }
+  .wrap { max-width: 780px; margin: 0 auto; width: 100%; }
+  header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap; margin-bottom: 16px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; letter-spacing: -.01em; }
+  .sub { margin: 0; color: var(--sub); font-size: 12px; }
+  .status {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px;
+    border-radius: 999px; background: #fff; border: 1px solid var(--line); font-size: 12px;
+  }
+  .status i { width: 8px; height: 8px; border-radius: 50%; background: #c9c9c9; }
+  .status[data-kind="ok"] i { background: var(--ok); }
+  .status[data-kind="err"] i { background: var(--err); }
+  .status[data-kind="wait"] i { background: var(--warn); }
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 14px; padding: 14px; margin-bottom: 12px;
+    min-width: 0; overflow-wrap: anywhere;
+  }
+  h2 { font-size: 12px; margin: 0 0 10px; color: var(--sub); font-weight: 600; letter-spacing: .04em; }
+  button, .btn {
+    font: inherit; height: 40px; padding: 0 14px; border-radius: 10px;
+    border: 1px solid var(--line); background: #fff; color: var(--text);
+    cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+    text-decoration: none; white-space: nowrap;
+  }
+  button:disabled { opacity: .42; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #06283d; font-weight: 600; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 8px; }
+  .grid button { flex-direction: column; gap: 2px; height: 52px; font-size: 12px; min-width: 0; padding: 0 6px; }
+  .grid button small { color: var(--sub); font-size: 10px; letter-spacing: .04em; }
+  .field { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .field span { width: 72px; flex: 0 0 auto; color: var(--sub); font-size: 12px; }
+  .field input {
+    flex: 1 1 auto; min-width: 0; height: 40px; padding: 0 10px;
+    border: 1px solid var(--line); border-radius: 10px; font: inherit; background: #fafaf7;
+  }
+  .slider-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .slider-name { width: 40px; flex: 0 0 auto; font-size: 12px; color: var(--sub); }
+  .slider-row input[type="range"] { flex: 1 1 auto; min-width: 0; height: 28px; accent-color: #8bc8ea; }
+  .slider-val {
+    width: 86px; flex: 0 0 auto; text-align: right; font-size: 11px;
+    font-variant-numeric: tabular-nums; color: var(--sub);
+  }
+  .cal-row { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 8px; align-items: center; margin-bottom: 8px; }
+  .cal-row > span { font-size: 12px; color: var(--sub); }
+  .cal-fields { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; min-width: 0; flex: 1 1 auto; }
+  .cal-fields label { font-size: 11px; color: var(--sub); display: inline-flex; align-items: center; gap: 4px; }
+  .cal-fields input {
+    width: 54px; height: 32px; padding: 0 6px; border: 1px solid var(--line);
+    border-radius: 8px; font: inherit;
+  }
+  .cal-fields button { height: 32px; padding: 0 8px; font-size: 11px; border-radius: 8px; }
+  pre#log {
+    margin: 0; height: 168px; overflow: auto; padding: 10px; border-radius: 10px;
+    background: #fafaf7; border: 1px solid var(--line);
+    font: 12px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; word-break: break-all;
+  }
+  .hint { margin: 8px 0 0; font-size: 12px; color: var(--sub); line-height: 1.55; }
+  .modal {
+    position: fixed; inset: 0; background: rgba(20, 20, 20, .4); z-index: 10;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal[hidden] { display: none; }
+  .modal-card {
+    background: #fff; border-radius: 14px; padding: 18px;
+    max-width: 460px; width: 100%; max-height: 80vh; overflow: auto;
+  }
+  .modal-card h3 { font-size: 15px; margin: 0 0 10px; }
+  .modal-card p { font-size: 13px; color: #3d3d3d; margin: 0 0 8px; }
+  .modal-card code { background: #f4f3ee; padding: 1px 5px; border-radius: 5px; font-size: 12px; }
+  @media (max-width: 480px) {
+    .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .slider-val { width: 72px; font-size: 10px; }
+    .cal-fields input { width: 48px; }
+    .cal-fields button { padding: 0 6px; }
+    h1 { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>机械手上位机</h1>
+      <p class="sub">XiaochuHand 的网页等价版 · BLE 直连 · 无需安装</p>
+    </div>
+    <div class="status" id="stateEl" data-kind=""><i></i><span>未连接</span></div>
+  </header>
+
+  <section class="card">
+    <h2>1 · TARGET</h2>
+    <div class="row" style="margin-bottom:10px">
+      <button class="primary" id="modeName" disabled style="height:34px;font-size:12px">Name</button>
+      <button id="modeAddr" disabled style="height:34px;font-size:12px">Address</button>
+    </div>
+    <div class="field">
+      <span>设备名</span>
+      <input type="text" id="deviceName" value="xiaochu" autocomplete="off" />
+    </div>
+    <div class="field">
+      <span>MAC 地址</span>
+      <input type="text" id="deviceAddr" value="" placeholder="网页端不支持" disabled />
+    </div>
+    <p class="hint">
+      Web Bluetooth 只能按名称前缀过滤设备，无法像桌面程序那样按 MAC 地址连接，所以 Address 模式在浏览器里不可用。
+    </p>
+  </section>
+
+  <section class="card">
+    <h2>2 · 连接与控制</h2>
+    <div class="row">
+      <button class="primary" id="btnConnect">连接</button>
+      <button id="btnDisconnect" disabled>断开</button>
+      <button id="btnAbout">关于</button>
+      <button disabled title="固件未实现 Settings 特征">设置</button>
+      <button disabled title="固件未实现 OTA 特征">OTA</button>
+      <a class="btn" href="capture.html">视觉驱动 →</a>
+    </div>
+    <p class="hint">
+      连接后浏览器会弹出设备选择框，选中广播名为 <code>xiaochu</code> 的机械手；首次连接会请求蓝牙权限。
+    </p>
+  </section>
+
+  <section class="card">
+    <h2>3 · POSITIONS / MOVEMENTS</h2>
+    <div class="grid" id="presetGrid"></div>
+    <p class="hint">
+      与 XiaochuHand.exe 完全相同的 11 个预设。每指 0–100 先按作者的 <code>angle = round(v × 1.8)</code> 换算，
+      再套本地标定（0° 伸直、180° 握拳）。
+    </p>
+  </section>
+
+  <section class="card">
+    <h2>4 · 手指控制（0–100 → 0–180°）</h2>
+    <div id="sliderList"></div>
+    <div class="row" style="margin-top:10px">
+      <button id="btnAllOpen">全部伸直</button>
+      <button id="btnAllFist">全部握拳</button>
+    </div>
+    <p class="hint">拖动滑杆即按 10 Hz 节流下发，角度变化 ≤1° 不重复写。</p>
+  </section>
+
+  <section class="card">
+    <h2>5 · 自定义指令</h2>
+    <div class="row">
+      <input type="text" id="customInput" placeholder="servo_0=90 或 fist" autocomplete="off"
+             style="flex:1 1 200px;min-width:0;height:40px;padding:0 10px;border:1px solid var(--line);border-radius:10px;font:inherit;background:#fafaf7" />
+      <button class="primary" id="btnCustom">发送</button>
+    </div>
+    <p class="hint">
+      格式 <code>servo_&lt;通道&gt;=&lt;角度&gt;</code>（通道 0–4，角度 0–180）；其它字符串由固件按手势名解析。
+    </p>
+  </section>
+
+  <section class="card">
+    <h2>6 · 标定（每指 伸直 / 握拳 角度）</h2>
+    <div id="calList"></div>
+    <div class="row" style="margin-top:4px">
+      <button class="primary" id="btnApplyCal">应用标定</button>
+      <button id="btnCopyCal">复制 JSON</button>
+      <button id="btnResetCal">恢复默认</button>
+    </div>
+    <p class="hint">
+      「试发」会把这个角度直接写进对应舵机，用来确认物理姿态：手指真伸直的那个角度填进「伸直」，
+      真握拳的填进「握拳」，五点都确认后点应用。装配基准与作者不同的手指就靠这一步补偿。
+    </p>
+  </section>
+
+  <section class="card">
+    <h2>7 · 日志</h2>
+    <pre id="log">等待连接…</pre>
+  </section>
+
+</div>
+
+<div class="modal" id="aboutModal" hidden>
+  <div class="modal-card">
+    <h3>关于这个网页版</h3>
+    <p>它复刻了作者上位机 <code>XiaochuHand.exe</code> 的核心驱动逻辑：同一条 <code>servo_&lt;idx&gt;=&lt;angle&gt;</code> 指令、
+      同一套 <code>PRESET_ANGLES</code> 预设表、同一个 <code>angle = round(v × 1.8)</code> 换算。</p>
+    <p>差异有两处：</p>
+    <p>① 浏览器无法按 MAC 地址连接，只能用名称前缀扫描；<br/>
+       ② 作者固件没有 Settings / OTA 特征，对应的按钮在这里是禁用状态。</p>
+    <p>另外增加了「标定」面板：作者假设每根舵机的 0° 就是伸直位，装配基准不同时用标定补偿，不必改固件。</p>
+    <p style="color:#6b7280;font-size:12px">本源为 finger-motion-replay 项目，逆向结论见 <code>docs/小楚君机械手-BLE打通.md</code> 第 9 节。</p>
+    <div class="row" style="margin-top:14px;justify-content:flex-end">
+      <button id="btnCloseAbout">知道了</button>
+    </div>
+  </div>
+</div>
+
+<script src="ble-bridge.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var ble = window.BleHand;
+  if (!ble) return;
+
+  var ZH = {
+    five: "张开", four: "四", three: "三", two: "二", one: "一",
+    ok: "OK", rock: "摇滚", love: "比心", fist: "握拳", scratch: "挠", come: "过来"
+  };
+
+  var stateEl = document.getElementById("stateEl");
+  var stateText = stateEl.querySelector("span");
+  var btnConnect = document.getElementById("btnConnect");
+  var btnDisconnect = document.getElementById("btnDisconnect");
+  var logEl = document.getElementById("log");
+  var sliderEls = {};
+  var angleEls = {};
+  var calStore = {};
+
+  function log(msg) {
+    var t = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+    logEl.textContent = ("[" + t + "] " + msg + "\n" + logEl.textContent).slice(0, 5000);
+  }
+
+  function setState(text, kind) {
+    stateText.textContent = text;
+    stateEl.dataset.kind = kind || "";
+  }
+
+  function refreshButtons() {
+    var c = ble.isConnected();
+    btnConnect.disabled = c;
+    btnDisconnect.disabled = !c;
+  }
+
+  function currentFrame() {
+    var frame = {};
+    ble.FINGERS.forEach(function (f) {
+      frame[f.name] = { flex: Number(sliderEls[f.name].value) };
+    });
+    return frame;
+  }
+
+  function pushFrame() {
+    if (!ble.isConnected()) return;
+    ble.setEnabled(true);
+    ble.send(currentFrame());
+  }
+
+  function refreshAngle(f) {
+    var v = Number(sliderEls[f.name].value);
+    var a = ble.flexToAngle(f, v);
+    var authorAngle = Math.max(0, Math.min(180, Math.round(v * 1.8)));
+    angleEls[f.name].textContent = v + " → " + a + "°";
+    angleEls[f.name].title = "作者公式 " + v + " × 1.8 = " + authorAngle + "°";
+  }
+
+  // ---------- 滑杆 ----------
+  var sliderList = document.getElementById("sliderList");
+  ble.FINGERS.forEach(function (f) {
+    var row = document.createElement("div");
+    row.className = "slider-row";
+
+    var name = document.createElement("span");
+    name.className = "slider-name";
+    name.textContent = f.label;
+
+    var range = document.createElement("input");
+    range.type = "range";
+    range.min = "0";
+    range.max = "100";
+    range.step = "1";
+    range.value = "0";
+    range.addEventListener("input", function () {
+      refreshAngle(f);
+      pushFrame();
+    });
+
+    var val = document.createElement("span");
+    val.className = "slider-val";
+
+    row.appendChild(name);
+    row.appendChild(range);
+    row.appendChild(val);
+    sliderList.appendChild(row);
+
+    sliderEls[f.name] = range;
+    angleEls[f.name] = val;
+    refreshAngle(f);
+  });
+
+  function setAll(v) {
+    ble.FINGERS.forEach(function (f) {
+      sliderEls[f.name].value = String(v);
+      refreshAngle(f);
+    });
+    pushFrame();
+    log("全部 → flex " + v);
+  }
+
+  document.getElementById("btnAllOpen").addEventListener("click", function () { setAll(0); });
+  document.getElementById("btnAllFist").addEventListener("click", function () { setAll(100); });
+
+  // ---------- 预设 ----------
+  var presetGrid = document.getElementById("presetGrid");
+  (ble.PRESET_NAMES || []).forEach(function (name) {
+    var b = document.createElement("button");
+    var zh = document.createElement("span");
+    zh.textContent = ZH[name] || name;
+    var en = document.createElement("small");
+    en.textContent = name;
+    b.appendChild(zh);
+    b.appendChild(en);
+    b.addEventListener("click", function () {
+      var vals = ble.PRESET_FLEX[name];
+      ble.FINGERS.forEach(function (f, i) {
+        sliderEls[f.name].value = String(vals[i]);
+        refreshAngle(f);
+      });
+      if (!ble.isConnected()) {
+        log("未连接，预设 " + name + " 未发送");
+        return;
+      }
+      ble.setEnabled(true);
+      ble.sendPreset(name);
+      log("预设 " + name + " → [" + vals.join(",") + "]");
+    });
+    presetGrid.appendChild(b);
+  });
+
+  // ---------- 标定 ----------
+  var calList = document.getElementById("calList");
+
+  function renderCalHint() {
+    ble.FINGERS.forEach(function (f) {
+      var el = document.querySelector('[data-calval="' + f.name + '"]');
+      if (el) el.textContent = "开 " + f.open + "° / 合 " + f.closed + "°";
+    });
+  }
+
+  ble.FINGERS.forEach(function (f) {
+    var row = document.createElement("div");
+    row.className = "cal-row";
+
+    var name = document.createElement("span");
+    name.textContent = f.label;
+
+    var fields = document.createElement("div");
+    fields.className = "cal-fields";
+
+    function makeField(labelText, value, prop) {
+      var lab = document.createElement("label");
+      lab.appendChild(document.createTextNode(labelText));
+      var input = document.createElement("input");
+      input.type = "number";
+      input.min = "0";
+      input.max = "180";
+      input.value = String(value);
+      input.dataset.finger = f.name;
+      input.dataset.prop = prop;
+      lab.appendChild(input);
+      lab.appendChild(document.createTextNode("°"));
+      fields.appendChild(lab);
+      return input;
+    }
+
+    var openIn = makeField("伸直", f.open, "open");
+    var closedIn = makeField("握拳", f.closed, "closed");
+
+    var testOpen = document.createElement("button");
+    testOpen.textContent = "试发伸直";
+    testOpen.addEventListener("click", function () {
+      var v = Math.max(0, Math.min(180, Number(openIn.value) || 0));
+      ble.sendRaw("servo_" + f.ch + "=" + v);
+      log(f.label + " 试发 " + v + "°");
+    });
+
+    var testClosed = document.createElement("button");
+    testClosed.textContent = "试发握拳";
+    testClosed.addEventListener("click", function () {
+      var v = Math.max(0, Math.min(180, Number(closedIn.value) || 0));
+      ble.sendRaw("servo_" + f.ch + "=" + v);
+      log(f.label + " 试发 " + v + "°");
+    });
+
+    var cur = document.createElement("span");
+    cur.dataset.calval = f.name;
+    cur.style.fontSize = "11px";
+    cur.style.color = "#6b7280";
+
+    fields.appendChild(testOpen);
+    fields.appendChild(testClosed);
+    fields.appendChild(cur);
+
+    row.appendChild(name);
+    row.appendChild(fields);
+    calList.appendChild(row);
+
+    calStore[f.name] = { open: f.open, closed: f.closed };
+    openIn.addEventListener("input", function () {
+      calStore[f.name].open = Number(openIn.value) || 0;
+    });
+    closedIn.addEventListener("input", function () {
+      calStore[f.name].closed = Number(closedIn.value) || 0;
+    });
+  });
+
+  renderCalHint();
+
+  document.getElementById("btnApplyCal").addEventListener("click", function () {
+    var cal = {};
+    ble.FINGERS.forEach(function (f) {
+      var c = calStore[f.name];
+      cal[f.name] = { open: c.open, closed: c.closed };
+    });
+    ble.setCalibration(cal, true);
+    ble.FINGERS.forEach(function (f) { refreshAngle(f); });
+    renderCalHint();
+    log("已应用标定：" + JSON.stringify(cal));
+    pushFrame();
+  });
+
+  document.getElementById("btnCopyCal").addEventListener("click", function () {
+    var json = JSON.stringify(ble.getCalibration());
+    log("当前标定：" + json);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(json).then(function () {
+        log("已复制到剪贴板");
+      }).catch(function () {
+        log("复制失败，从日志里手动复制");
+      });
+    }
+  });
+
+  document.getElementById("btnResetCal").addEventListener("click", function () {
+    ble.resetCalibration();
+  });
+
+  // ---------- 自定义指令 ----------
+  var customInput = document.getElementById("customInput");
+  document.getElementById("btnCustom").addEventListener("click", function () {
+    var cmd = customInput.value.trim();
+    if (!cmd) return;
+    if (!ble.isConnected()) {
+      log("未连接，指令未发送");
+      return;
+    }
+    ble.sendRaw(cmd).then(function (ok) {
+      log("TX " + cmd + (ok ? "  OK" : "  失败"));
+    });
+  });
+
+  // ---------- 连接 ----------
+  ble.onStatus(function (text, kind) {
+    setState(text, kind);
+    refreshButtons();
+    log("状态：" + text);
+  });
+
+  document.getElementById("deviceName").addEventListener("change", function () {
+    ble.setDeviceName(this.value);
+    log("设备名过滤：" + ble.getDeviceName());
+  });
+
+  btnConnect.addEventListener("click", function () {
+    if (!ble.supports()) {
+      setState("浏览器不支持 Web Bluetooth", "err");
+      log("请用桌面版 Chrome / Edge，并通过 localhost 打开");
+      return;
+    }
+    ble.setDeviceName(document.getElementById("deviceName").value);
+    log("请求连接 " + ble.getDeviceName() + " …");
+    ble.connect().then(function () {
+      refreshButtons();
+      ble.setEnabled(true);
+    }).catch(function (err) {
+      setState("连接失败", "err");
+      log("连接失败：" + (err && err.message ? err.message : err));
+    });
+  });
+
+  btnDisconnect.addEventListener("click", function () {
+    ble.disconnect().then(function () { refreshButtons(); });
+  });
+
+  // ---------- 关于 ----------
+  var aboutModal = document.getElementById("aboutModal");
+  document.getElementById("btnAbout").addEventListener("click", function () {
+    aboutModal.hidden = false;
+  });
+  document.getElementById("btnCloseAbout").addEventListener("click", function () {
+    aboutModal.hidden = true;
+  });
+  aboutModal.addEventListener("click", function (e) {
+    if (e.target === aboutModal) aboutModal.hidden = true;
+  });
+
+  refreshButtons();
+  if (!ble.supports()) setState("浏览器不支持 Web Bluetooth", "err");
+})();
+</script>
+</body>
+</html>
