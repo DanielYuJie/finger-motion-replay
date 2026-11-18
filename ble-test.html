@@ -65,6 +65,12 @@
     white-space: pre-wrap; word-break: break-all;
   }
   .note { font-size: 11.5px; color: #6B7280; margin-top: 8px; }
+  .cal { display: flex; gap: 6px; margin: 6px 0 2px; align-items: center; flex-wrap: wrap; }
+  .cal button {
+    font-size: 11px; padding: 6px 9px; min-height: 30px; border-radius: 8px;
+    background: #FFFFFF; border: 1px solid rgba(0,0,0,0.12); color: #1A1B1C;
+  }
+  .cal-val { font-size: 11px; color: #6B7280; font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body>
@@ -93,12 +99,15 @@
   </div>
 
   <div class="card">
-    <h2>03 角度直发（servo_i = 0–180）</h2>
+    <h2>03 角度直发 + 逐指标定（servo_i = 0–180）</h2>
     <div class="grid5" id="angleInputs"></div>
+    <div class="note">把手指摆到伸直，拖数字到该角度点「记伸直」；摆到握拳点「记握拳」。全部记完后点「应用标定」，滑杆映射立刻生效。</div>
     <div class="row" style="margin-top:10px;">
       <button id="btnSendAngles">发送这组角度</button>
+      <button id="btnApplyCal" class="primary">应用标定</button>
+      <button id="btnCopyCal">复制 JSON</button>
+      <button id="btnResetCal">恢复默认</button>
     </div>
-    <div class="note">这一组绕过标定，直接写给舵机；用来核对某根手指的方向是否装反。</div>
   </div>
 
   <div class="card">
@@ -129,6 +138,18 @@
 
   var sliders = {};
   var angleInputs = {};
+  var calStore = {};
+
+  function renderCal() {
+    ble.FINGERS.forEach(function (f) {
+      var el = document.querySelector('[data-cal-val="' + f.name + '"]');
+      if (!el) return;
+      var c = calStore[f.name] || {};
+      var open = c.open !== undefined ? c.open : f.open;
+      var closed = c.closed !== undefined ? c.closed : f.closed;
+      el.textContent = "开 " + open + "° / 合 " + closed + "°";
+    });
+  }
 
   function log(msg) {
     var t = new Date().toLocaleTimeString("zh-CN", { hour12: false });
@@ -184,6 +205,27 @@
     num.value = String(f.open);
     num.dataset.ch = String(f.ch);
     lab.appendChild(num);
+
+    var calRow = document.createElement("div");
+    calRow.className = "cal";
+    calRow.innerHTML =
+      '<button data-cal="open">记伸直</button>' +
+      '<button data-cal="closed">记握拳</button>' +
+      '<span class="cal-val" data-cal-val="' + f.name + '"></span>';
+    calRow.querySelector('[data-cal="open"]').addEventListener("click", function () {
+      if (!calStore[f.name]) calStore[f.name] = {};
+      calStore[f.name].open = Math.max(0, Math.min(180, Number(num.value) || 0));
+      renderCal();
+      log(f.label + " 伸直位记为 " + calStore[f.name].open + "°");
+    });
+    calRow.querySelector('[data-cal="closed"]').addEventListener("click", function () {
+      if (!calStore[f.name]) calStore[f.name] = {};
+      calStore[f.name].closed = Math.max(0, Math.min(180, Number(num.value) || 0));
+      renderCal();
+      log(f.label + " 握拳位记为 " + calStore[f.name].closed + "°");
+    });
+    lab.appendChild(calRow);
+
     inputsBox.appendChild(lab);
     angleInputs[f.name] = num;
   });
@@ -254,6 +296,48 @@
     });
   });
 
+  document.getElementById("btnApplyCal").addEventListener("click", function () {
+    var cal = {};
+    ble.FINGERS.forEach(function (f) {
+      var c = calStore[f.name];
+      if (!c) return;
+      cal[f.name] = {
+        open: c.open !== undefined ? c.open : f.open,
+        closed: c.closed !== undefined ? c.closed : f.closed
+      };
+    });
+    if (!Object.keys(cal).length) {
+      log("还没有记录任何标定点");
+      return;
+    }
+    ble.setCalibration(cal, true);
+    log("已应用标定：" + JSON.stringify(cal));
+
+    ble.FINGERS.forEach(function (f) {
+      var row = sliders[f.name].parentNode;
+      row.querySelector('[data-angle="' + f.name + '"]').textContent =
+        ble.flexToAngle(f, Number(sliders[f.name].value)) + "°";
+      angleInputs[f.name].value = String(f.open);
+    });
+    renderCal();
+  });
+
+  document.getElementById("btnCopyCal").addEventListener("click", function () {
+    var json = JSON.stringify(ble.getCalibration());
+    log("当前标定：" + json);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(json).then(function () {
+        log("已复制到剪贴板，可直接发给我写进默认表");
+      }).catch(function () {
+        log("复制失败，从日志里手动复制");
+      });
+    }
+  });
+
+  document.getElementById("btnResetCal").addEventListener("click", function () {
+    ble.resetCalibration();
+  });
+
   document.getElementById("btnSendCmd").addEventListener("click", function () {
     var cmd = document.getElementById("cmdInput").value.trim();
     if (!cmd) return;
@@ -267,6 +351,7 @@
   });
 
   refreshButtons();
+  renderCal();
   setState(ble.supports() ? "未连接" : "不支持 Web Bluetooth", ble.supports() ? "" : "err");
 })();
 </script>

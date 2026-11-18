@@ -22,6 +22,29 @@
 
   const SEND_INTERVAL_MS = 100; // 10 Hz，避开 30 Hz 视觉帧写入压力
   const CHANGE_EPS = 1;         // 角度变化 <= 1° 不重复写
+  const CAL_KEY = "bleHandCal_v1";
+
+  function clampAngle(v) {
+    return Math.max(0, Math.min(180, Math.round(Number(v) || 0)));
+  }
+
+  // 标定可覆盖：舵机装配方向不同，逐指 open/closed 需要现场重标
+  (function loadCalibration() {
+    try {
+      if (typeof localStorage === "undefined") return;
+      const raw = localStorage.getItem(CAL_KEY);
+      if (!raw) return;
+      const cal = JSON.parse(raw);
+      for (const f of FINGERS) {
+        const c = cal[f.name];
+        if (!c) continue;
+        if (c.open !== undefined) f.open = clampAngle(c.open);
+        if (c.closed !== undefined) f.closed = clampAngle(c.closed);
+      }
+    } catch (err) {
+      console.warn("[ble] load calibration failed", err);
+    }
+  })();
 
   let device = null;
   let server = null;
@@ -173,7 +196,33 @@
     FINGERS: FINGERS,
     getStats: function () { return Object.assign({}, stats); },
     supports: function () { return !!navigator.bluetooth; },
+    setCalibration: function (cal, persist) {
+      if (!cal) return;
+      for (const f of FINGERS) {
+        const c = cal[f.name];
+        if (!c) continue;
+        if (c.open !== undefined) f.open = clampAngle(c.open);
+        if (c.closed !== undefined) f.closed = clampAngle(c.closed);
+      }
+      lastWritten = {};
+      if (persist !== false) {
+        try {
+          localStorage.setItem(CAL_KEY, JSON.stringify(getCalibration()));
+        } catch (err) { /* 忽略 */ }
+      }
+    },
+    getCalibration: getCalibration,
+    resetCalibration: function () {
+      try { localStorage.removeItem(CAL_KEY); } catch (err) { /* 忽略 */ }
+      location.reload();
+    },
   };
+
+  function getCalibration() {
+    const out = {};
+    for (const f of FINGERS) out[f.name] = { open: f.open, closed: f.closed };
+    return out;
+  }
 
   console.log("[ble] BleHand ready, supports =", !!navigator.bluetooth);
 })();
