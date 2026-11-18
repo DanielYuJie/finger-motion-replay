@@ -669,6 +669,12 @@ Page({
     wx.navigateTo({ url: '/pages/pad/index' });
   },
 
+  /** PC 推理模式：抓帧交给电脑上的 MediaPipe，手背 / 遮挡场景更稳 */
+  onOpenRemote: function () {
+    if (this._running) this.stopSession();   // VKSession 是页面级单例，别让两个识别同时占着摄像头
+    wx.navigateTo({ url: '/pages/remote/index' });
+  },
+
   onBleConnect: function () {
     var self = this;
     if (!this.ble) return;

@@ -338,3 +338,26 @@ iPhone 性能预期：VisionKit 为系统能力、推理开销低，帧率主要
 
 > 网页端 `app.js` 里的 `computeFingerAngles()` 是**独立实现**，本轮未同步改动。
 > 如需两端一致，把 `miniprogram/core/hand.js` 的算法搬过去即可。
+
+## PC 推理模式（pages/remote）
+
+小程序自带的 VisionKit 在手背朝镜头、手指被手背遮挡时识别很弱，而小楚君上位机用的 MediaPipe
+`hand_landmarker.task` 在同一场景下稳得多。模型塞不进小程序，于是做成「抓帧上传 → PC 推理 → 回传角度」。
+
+入口：采集页「PC 推理模式（手背 / 遮挡更稳）」→ `wx.navigateTo('/pages/remote/index')`。
+
+链路：
+
+```
+<camera frame-size="small">  →  onCameraFrame（RGBA）
+   →  wx.arrayBufferToBase64
+   →  POST http://<PC-IP>:8767/infer
+   →  {flex:{...}}  →  BLE 直连机械手
+```
+
+- 5 Hz 上传（200 ms 一帧），上一帧未返回就丢帧，不排队
+- 打开页面不会占用 VKSession；从采集页进入时会先 `stopSession()`
+- 停止抓帧 / 离开页面自动把机械手写回伸直位
+- 手机与 PC 必须同一 Wi-Fi；开发者工具需勾「不校验合法域名」
+
+PC 端服务与实测数据见 [`../pc-server/README.md`](../pc-server/README.md)。

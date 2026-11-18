@@ -1,7 +1,8 @@
 {
   "pages": [
     "pages/capture/index",
-    "pages/pad/index"
+    "pages/pad/index",
+    "pages/remote/index"
   ],
   "window": {
     "navigationBarTitleText": "手指运动采集",

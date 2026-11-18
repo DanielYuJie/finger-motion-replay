@@ -1,0 +1,48 @@
+<!-- pages/remote/index.wxml — PC 推理模式 -->
+<view class="wrap">
+
+  <camera class="cam" device-position="{{device}}" frame-size="small" flash="off" bindstop="stopFrames" binderror="onCamError"></camera>
+
+  <view class="panel">
+
+    <view class="seg">
+      <input class="url" value="{{url}}" bindinput="onUrlInput" placeholder="http://192.168.1.9:8767" confirm-type="done" />
+      <view class="btn sm" bindtap="onPing">测试</view>
+      <view class="btn sm" bindtap="onSwitchDevice">{{device === 'front' ? '前置' : '后置'}}</view>
+    </view>
+
+    <view class="stat {{pcOk ? 'ok' : 'warn'}}">
+      <view class="dot"></view>
+      <text class="txt">{{pcState}}</text>
+      <text class="meta">{{latency}} · {{fps}}</text>
+    </view>
+
+    <view class="fingers">
+      <view class="f" wx:for="{{flex}}" wx:key="name">
+        <view class="fl">{{item.label}}</view>
+        <view class="fv">{{item.flex}}</view>
+        <view class="bar"><view class="fill" style="width:{{item.flex}}%"></view></view>
+      </view>
+    </view>
+
+    <view class="ops">
+      <view class="btn {{running ? 'live' : ''}}" bindtap="onStart">{{running ? '停止抓帧' : '开始识别'}}</view>
+      <view class="btn {{bleConnected ? 'live' : ''}}" bindtap="onBleConnect">{{bleConnected ? '断开机械手' : '连接机械手'}}</view>
+    </view>
+
+    <view class="drive">
+      <text class="dl">用识别结果驱动机械手</text>
+      <switch checked="{{drive}}" bindchange="onToggleDrive" color="#C89B5A" />
+    </view>
+
+    <view class="bleline">{{bleStatus}}</view>
+
+    <scroll-view class="logs" scroll-y>
+      <view class="li" wx:for="{{logs}}" wx:key="t">
+        <text class="lt">{{item.t}}</text>
+        <text class="lm">{{item.msg}}</text>
+      </view>
+    </scroll-view>
+
+  </view>
+</view>
