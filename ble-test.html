@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BLE 机械手 · 通路调试</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 20px 16px 40px;
+    font-family: 'Roboto', 'PingFang SC', 'Segoe UI', Arial, sans-serif;
+    background: #F4F3EE; color: #1A1B1C; line-height: 1.5;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { font-size: 12px; color: #6B7280; margin-bottom: 16px; }
+  .card {
+    background: #FFFFFF; border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 14px; padding: 14px 16px; margin-bottom: 12px;
+  }
+  .card h2 {
+    font-size: 13px; margin: 0 0 10px; color: #4A6B7C;
+    font-weight: 600; letter-spacing: .02em;
+  }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .state {
+    display: inline-block; font-size: 12px; padding: 3px 10px; border-radius: 999px;
+    background: rgba(0,0,0,0.05); color: #6B7280;
+  }
+  .state[data-kind="ok"] { background: rgba(82,196,26,0.14); color: #2E7D1B; }
+  .state[data-kind="err"] { background: rgba(234,102,104,0.14); color: #B03A3C; }
+  .state[data-kind="wait"] { background: rgba(250,173,20,0.16); color: #8A6100; }
+  button {
+    font: inherit; font-size: 13px; padding: 9px 14px; min-height: 40px;
+    border-radius: 10px; border: 1px solid rgba(0,0,0,0.10);
+    background: #FFFFFF; color: #1A1B1C; cursor: pointer;
+  }
+  button.primary { background: #8BC8EA; border-color: #6FAFD2; color: #0F2A38; font-weight: 600; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .finger { margin: 10px 0 14px; }
+  .finger__head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 13px; margin-bottom: 2px;
+  }
+  .finger__head b { font-variant-numeric: tabular-nums; }
+  .finger__head span { font-size: 11px; color: #6B7280; }
+  input[type="range"] { width: 100%; accent-color: #8BC8EA; height: 32px; }
+  .grid5 { display: flex; gap: 8px; flex-wrap: wrap; }
+  .grid5 label { flex: 1 1 96px; font-size: 11px; color: #6B7280; }
+  .grid5 input[type="number"] {
+    width: 100%; font: inherit; font-size: 13px; padding: 7px 8px; margin-top: 3px;
+    border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; background: #FFF;
+  }
+  input[type="text"] {
+    flex: 1 1 180px; min-width: 0; font: inherit; font-size: 13px; padding: 9px 10px;
+    border: 1px solid rgba(0,0,0,0.12); border-radius: 10px; background: #FFF;
+  }
+  .check { font-size: 12px; color: #4A6B7C; display: inline-flex; gap: 6px; align-items: center; }
+  .check input { width: 16px; height: 16px; accent-color: #8BC8EA; }
+  #log {
+    height: 190px; overflow: auto; font-family: Consolas, 'Courier New', monospace;
+    font-size: 11.5px; line-height: 1.55; background: #FAFAF7;
+    border: 1px solid rgba(0,0,0,0.06); border-radius: 10px; padding: 8px 10px;
+    white-space: pre-wrap; word-break: break-all;
+  }
+  .note { font-size: 11.5px; color: #6B7280; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>BLE 机械手 · 通路调试</h1>
+  <p class="sub">先只验连接和写入，不接摄像头。设备名 xiaochu · Chrome / Edge · 需通过 http://127.0.0.1:8000 打开。</p>
+
+  <div class="card">
+    <h2>01 连接</h2>
+    <div class="row">
+      <button id="btnConnect" class="primary">连接机械手</button>
+      <button id="btnDisconnect" disabled>断开</button>
+      <span class="state" id="state" data-kind="">未连接</span>
+    </div>
+    <div class="note" id="hint">首次连接会弹出设备选择框，选中广播名为 xiaochu 的设备。</div>
+  </div>
+
+  <div class="card">
+    <h2>02 五指（flex 0–100 → 舵机角度）</h2>
+    <div id="fingers"></div>
+    <div class="row" style="margin-top:4px;">
+      <label class="check"><input type="checkbox" id="autoSend" checked /><span>拖动即发送（10 Hz）</span></label>
+      <button id="btnOpen">全部伸直</button>
+      <button id="btnFist">全部握拳</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>03 角度直发（servo_i = 0–180）</h2>
+    <div class="grid5" id="angleInputs"></div>
+    <div class="row" style="margin-top:10px;">
+      <button id="btnSendAngles">发送这组角度</button>
+    </div>
+    <div class="note">这一组绕过标定，直接写给舵机；用来核对某根手指的方向是否装反。</div>
+  </div>
+
+  <div class="card">
+    <h2>04 单条指令</h2>
+    <div class="row">
+      <input type="text" id="cmdInput" value="servo_0=90" placeholder="例如 servo_0=90 或 fist" />
+      <button id="btnSendCmd">发送</button>
+    </div>
+    <div class="note">角度直发格式：servo_&lt;通道&gt;=&lt;角度&gt;，通道 0–4，角度 0–180；其余字符串按 11 个手势名解析。</div>
+  </div>
+
+  <div class="card">
+    <h2>05 日志</h2>
+    <div id="log">等待连接…</div>
+  </div>
+</div>
+
+<script src="ble-bridge.js"></script>
+<script>
+(function () {
+  "use strict";
+  var ble = window.BleHand;
+  var stateEl = document.getElementById("state");
+  var logEl = document.getElementById("log");
+  var btnConnect = document.getElementById("btnConnect");
+  var btnDisconnect = document.getElementById("btnDisconnect");
+  var autoSend = document.getElementById("autoSend");
+
+  var sliders = {};
+  var angleInputs = {};
+
+  function log(msg) {
+    var t = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+    logEl.textContent += "\n[" + t + "] " + msg;
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function setState(text, kind) {
+    stateEl.textContent = text;
+    stateEl.dataset.kind = kind || "";
+  }
+
+  function refreshButtons() {
+    var connected = ble.isConnected();
+    btnConnect.disabled = connected;
+    btnDisconnect.disabled = !connected;
+  }
+
+  var fingersBox = document.getElementById("fingers");
+  var inputsBox = document.getElementById("angleInputs");
+  ble.FINGERS.forEach(function (f) {
+    var row = document.createElement("div");
+    row.className = "finger";
+    row.innerHTML =
+      '<div class="finger__head"><b>' + f.label + '</b>' +
+      '<span><i data-flex="' + f.name + '">0</i> → <i data-angle="' + f.name + '">' + f.open + '°</i></span></div>';
+    var slider = document.createElement("input");
+    slider.type = "range";
+    slider.min = "0";
+    slider.max = "100";
+    slider.value = "0";
+    slider.step = "1";
+    slider.dataset.finger = f.name;
+    slider.addEventListener("input", function () {
+      var flex = Number(slider.value);
+      row.querySelector('[data-flex="' + f.name + '"]').textContent = flex;
+      row.querySelector('[data-angle="' + f.name + '"]').textContent = ble.flexToAngle(f, flex) + "°";
+      if (autoSend.checked) {
+        ble.setEnabled(true);
+        ble.send(currentFingers());
+      }
+    });
+    row.appendChild(slider);
+    fingersBox.appendChild(row);
+    sliders[f.name] = slider;
+
+    var lab = document.createElement("label");
+    lab.textContent = f.label;
+    var num = document.createElement("input");
+    num.type = "number";
+    num.min = "0";
+    num.max = "180";
+    num.value = String(f.open);
+    num.dataset.ch = String(f.ch);
+    lab.appendChild(num);
+    inputsBox.appendChild(lab);
+    angleInputs[f.name] = num;
+  });
+
+  function currentFingers() {
+    var out = {};
+    ble.FINGERS.forEach(function (f) {
+      out[f.name] = { flex: Number(sliders[f.name].value) };
+    });
+    return out;
+  }
+
+  function setAll(flex) {
+    ble.FINGERS.forEach(function (f) {
+      sliders[f.name].value = String(flex);
+      var row = sliders[f.name].parentNode;
+      row.querySelector('[data-flex="' + f.name + '"]').textContent = flex;
+      row.querySelector('[data-angle="' + f.name + '"]').textContent = ble.flexToAngle(f, flex) + "°";
+    });
+    if (ble.isConnected()) {
+      ble.setEnabled(true);
+      ble.send(currentFingers());
+      log("全部 → flex " + flex);
+    }
+  }
+
+  ble.onStatus(function (text, kind) {
+    setState(text, kind);
+    refreshButtons();
+    log("状态：" + text);
+  });
+
+  btnConnect.addEventListener("click", function () {
+    if (!ble.supports()) {
+      setState("不支持 Web Bluetooth", "err");
+      log("当前浏览器不支持 Web Bluetooth，请换 Chrome / Edge 并通过 localhost 打开");
+      return;
+    }
+    log("请求连接 xiaochu…");
+    ble.connect().then(function () {
+      refreshButtons();
+    }).catch(function (err) {
+      setState("连接失败", "err");
+      log("连接失败：" + (err && err.message ? err.message : err));
+    });
+  });
+
+  btnDisconnect.addEventListener("click", function () {
+    ble.disconnect().then(function () { refreshButtons(); });
+  });
+
+  document.getElementById("btnOpen").addEventListener("click", function () { setAll(0); });
+  document.getElementById("btnFist").addEventListener("click", function () { setAll(100); });
+
+  document.getElementById("btnSendAngles").addEventListener("click", function () {
+    if (!ble.isConnected()) {
+      log("未连接，先连接设备");
+      return;
+    }
+    var chain = Promise.resolve();
+    ble.FINGERS.forEach(function (f) {
+      chain = chain.then(function () {
+        var ang = Math.max(0, Math.min(180, Number(angleInputs[f.name].value) || 0));
+        return ble.sendRaw("servo_" + f.ch + "=" + ang).then(function (ok) {
+          log("TX servo_" + f.ch + "=" + ang + (ok ? "  OK" : "  失败"));
+        });
+      });
+    });
+  });
+
+  document.getElementById("btnSendCmd").addEventListener("click", function () {
+    var cmd = document.getElementById("cmdInput").value.trim();
+    if (!cmd) return;
+    if (!ble.isConnected()) {
+      log("未连接，先连接设备");
+      return;
+    }
+    ble.sendRaw(cmd).then(function (ok) {
+      log("TX " + cmd + (ok ? "  OK" : "  失败"));
+    });
+  });
+
+  refreshButtons();
+  setState(ble.supports() ? "未连接" : "不支持 Web Bluetooth", ble.supports() ? "" : "err");
+})();
+</script>
+</body>
+</html>

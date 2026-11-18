@@ -619,6 +619,7 @@
         window.__replayUpdate(smoothed, angles, focusName);
       }
       pushBridge(angles);
+      if (window.BleHand) window.BleHand.send(angles);
       return;
     }
 
@@ -637,6 +638,7 @@
         window.__replayUpdate(null, null, null);
       }
       pushBridge(null);
+      if (window.BleHand) window.BleHand.send(null);
     }
   }
 
@@ -1030,6 +1032,55 @@
     "origin=",
     location.origin
   );
+
+  // ---- BLE 机械手（Web Bluetooth，依赖 ble-bridge.js 先加载）----
+  (function initBlePanel() {
+    const bleState = $("bleStatus");
+    const bleConnect = $("btnBleConnect");
+    const bleDisconnect = $("btnBleDisconnect");
+    const bleToggle = $("bleEnable");
+    if (!bleState || !bleConnect || !window.BleHand) return;
+
+    function syncBleButtons() {
+      const connected = window.BleHand.isConnected();
+      bleConnect.disabled = connected;
+      bleConnect.textContent = connected ? "已连接" : "连接机械手";
+      bleDisconnect.disabled = !connected;
+      bleToggle.disabled = !connected;
+      if (!connected) {
+        bleToggle.checked = false;
+        window.BleHand.setEnabled(false);
+      }
+    }
+
+    window.BleHand.onStatus(function (text, kind) {
+      bleState.textContent = text;
+      bleState.dataset.kind = kind || "";
+      syncBleButtons();
+    });
+
+    bleConnect.addEventListener("click", function () {
+      window.BleHand.connect().catch(function (err) {
+        showError("BLE 连接失败：" + (err && err.message ? err.message : err));
+      });
+    });
+
+    bleDisconnect.addEventListener("click", function () {
+      window.BleHand.disconnect().then(syncBleButtons);
+    });
+
+    bleToggle.addEventListener("change", function () {
+      window.BleHand.setEnabled(bleToggle.checked);
+    });
+
+    if (!window.BleHand.supports()) {
+      bleState.textContent = "浏览器不支持 BLE";
+      bleState.dataset.kind = "err";
+      bleConnect.disabled = true;
+    } else {
+      syncBleButtons();
+    }
+  })();
 
   window.__mcStart = startCamera;
   // 供自检/联调使用：可传入 21 个 landmark 直接验算关节角，或直接渲染一组角度

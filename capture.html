@@ -231,6 +231,23 @@
         </div>
       </section>
 
+      <section class="pane" aria-label="BLE 机械手">
+        <div class="pane-head">
+          <span class="tick" aria-hidden="true"></span>
+          <h2>BLE 机械手</h2>
+          <span class="bridge-state" id="bleStatus" data-kind="">未连接</span>
+        </div>
+        <div class="side-actions">
+          <button id="btnBleConnect" class="btn primary wide">连接机械手</button>
+          <button id="btnBleDisconnect" class="btn" disabled>断开</button>
+        </div>
+        <label class="check"><input type="checkbox" id="bleEnable" disabled /><span>视觉驱动（flex → 舵机角度）</span></label>
+        <p class="pane-note left">
+          设备名 <code>xiaochu</code> · 需 Chrome / Edge 与 localhost · 首次连接在弹窗中选设备；
+          先验通路可打开 <a href="ble-test.html">BLE 调试页</a>。
+        </p>
+      </section>
+
       <section class="pane" aria-label="MC 桥接">
         <div class="pane-head">
           <span class="tick" aria-hidden="true"></span>
@@ -269,7 +286,8 @@
   </footer>
 </div>
 
-<script src="app.js?v=4"></script>
+<script src="ble-bridge.js?v=5"></script>
+<script src="app.js?v=5"></script>
 <script type="module" src="replay3d.js?v=4"></script>
 </body>
 </html>
