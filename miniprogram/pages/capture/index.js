@@ -28,6 +28,7 @@
 var handCore = require('../../core/hand.js');
 var stab = require('../../core/stability.js');
 var glview = require('../../core/glview.js');
+var bleHand = require('../../core/ble-hand.js');
 
 // 见上文坑 2：VisionKit 的 points 已是 0–1 归一化
 var POINTS_ARE_PIXELS = false;
@@ -105,6 +106,9 @@ Page({
     bridgeOn: false,        // 是否把关节角推送到机械手中继
     bridgeAddr: '',         // 电脑局域网地址，形如 192.168.1.100:8765
     bridgeStatus: '未连接',
+    bleConnected: false,    // 小楚君机械手 BLE 是否已连接
+    bleOn: false,           // 是否用视觉帧驱动 BLE 机械手
+    bleStatus: '未连接',
     fingerLabels: FINGER_LABELS,
     fingerIndex: 0,
     focusFlex: '—',
@@ -135,6 +139,22 @@ Page({
     this._fps = 0;
     this._lastBridge = 0;   // 桥接推送节流用
 
+    // BLE 直连小楚君机械手（不需要电脑中继）
+    var self = this;
+    this.ble = bleHand.createBleHand({
+      onStatus: function (text) {
+        var connected = self.ble ? self.ble.isConnected() : false;
+        var patch = {};
+        if (self.data.bleStatus !== text) patch.bleStatus = text;
+        if (self.data.bleConnected !== connected) patch.bleConnected = connected;
+        if (!connected && self.data.bleOn) {
+          patch.bleOn = false;
+          if (self.ble) self.ble.setEnabled(false);
+        }
+        if (Object.keys(patch).length) self.setData(patch);
+      }
+    });
+
     var app = getApp();
     this.setData({ sdkVersion: (app && app.globalData && app.globalData.sdkVersion) || '—' });
   },
@@ -144,7 +164,10 @@ Page({
     this.initCanvases();
   },
 
-  onUnload: function () { this.stopSession(); },
+  onUnload: function () {
+    this.stopSession();
+    if (this.ble) this.ble.destroy();
+  },
   onHide: function () { this.stopSession(); },
 
   /* ---------------- canvas ---------------- */
@@ -343,6 +366,11 @@ Page({
     this._gfxFrames = 0;
     this._gfxNull = 0;
     this.pushBridge(null, false);   // 关闭时通知机械手回零
+    if (this.ble) {
+      this.ble.setEnabled(false);
+      this.ble.park();              // BLE 机械手也回伸直位，避免松手后僵住
+    }
+    if (this.data.bleOn) this.setData({ bleOn: false });
 
     this.setData({
       running: false,
@@ -399,6 +427,7 @@ Page({
         this.drawGauge(0);
       }
       this.pushBridge(null, false);   // 手丢了：通知机械手回零
+      this.pushBle(null);             // BLE 机械手同步回伸直位
       return;
     }
 
@@ -410,6 +439,7 @@ Page({
     if (this.glv) this.glv.setPoints(smooth, this.focusTipIndex());
     this.pushUI(angles, raw.length, now);
     this.pushBridge(angles, true);    // 桥接：推送五指关节角
+    this.pushBle(angles);             // BLE 直连：驱动小楚君机械手
   },
 
   focusTipIndex: function () {
@@ -568,5 +598,43 @@ Page({
       success: function () { self._bridgeStatus('已连接'); },
       fail: function () { self._bridgeStatus('连接失败'); }
     });
+  },
+
+  /* ---------------- BLE 直连机械手 ---------------- */
+
+  onBleConnect: function () {
+    var self = this;
+    if (!this.ble) return;
+
+    if (this.ble.isConnected()) {
+      this.ble.disconnect(function () {
+        self.setData({ bleConnected: false, bleOn: false, bleStatus: '未连接' });
+      });
+      return;
+    }
+
+    this.ble.connect(function (err) {
+      if (err) {
+        self.setData({ bleConnected: false, bleOn: false });
+      } else {
+        self.setData({ bleConnected: true });
+      }
+    });
+  },
+
+  onBleToggle: function (e) {
+    var on = !!e.detail.value;
+    if (on && (!this.ble || !this.ble.isConnected())) {
+      this.setData({ bleOn: false, bleStatus: '未连接，先点「连接」' });
+      return;
+    }
+    this.setData({ bleOn: on });
+    if (this.ble) this.ble.setEnabled(on);
+  },
+
+  pushBle: function (angles) {
+    if (!this.data.bleOn) return;
+    if (!this.ble || !this.ble.isConnected()) return;
+    this.ble.send(angles);
   }
 });

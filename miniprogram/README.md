@@ -73,6 +73,25 @@ payload 与网页端 `app.js` 完全一致（`source: 'miniprogram-visionkit'`�
 > 正式发布时上述绕法失效（合法域名强制 HTTPS），仍需把中继部署到公网服务器，
 > 小程序 POST `https://your.domain/update` —— 需要域名和服务器，留待后续。
 
+### BLE 直连小楚君机械手（已实现，待真机验证）
+
+不经过电脑中继，小程序直接连机械手：
+
+1. 点「连接」，扫描广播名 `xiaochu` 的设备并建立 GATT 连接；
+2. 连上后打开「视觉驱动机械手」，VisionKit 的 `flex(0-100)` 按标定表换算成角度，
+   以 ASCII `servo_i=angle` 写入（绕开固件归一化 bug）；
+3. 手离开画面或关闭采集时，五指回伸直位，不会僵在最后姿态。
+
+| 项 | 值 |
+|---|---|
+| 设备名 | `xiaochu` |
+| Service | `89d60870-9908-4472-8f8c-e5b3e6573cd1` |
+| 写特征 | `39dea685-a63e-44b2-8819-9a202581f8fe` |
+
+- 10 Hz 节流 + 串行写入 + 角度变化去重；单帧 ≤ 20 字节，**不改固件即可用**；
+- iOS 首次连接会弹系统蓝牙授权；Android 扫描 BLE 通常需要系统定位权限开启；
+- 与「局域网桥接」可同时开，互不冲突。
+
 ---
 
 ## 文件与验证状态
@@ -82,6 +101,7 @@ payload 与网页端 `app.js` 完全一致（`source: 'miniprogram-visionkit'`�
 | 文件 | 内容 | 验证状态 |
 |---|---|---|
 | [`core/hand.js`](core/hand.js) | 21 点定义、关节角解算、坐标归一化 | ✅ **Node 量化验证** |
+| [`core/ble-hand.js`](core/ble-hand.js) | BLE 直连机械手：扫描/连接/串行写入/节流/回位 | ⚠️ 模拟 wx API 单测通过，待真机 |
 | [`core/stability.js`](core/stability.js) | One-Euro、显示滞回、出现/离开判定 | ✅ **Node 量化验证** |
 | [`app.json`](app.json) / [`app.js`](app.js) / [`app.wxss`](app.wxss) | 全局配置、基础库检查、设计令牌 | ⚠️ 仅语法 / JSON 校验 |
 | [`pages/capture/`](pages/capture/) | 页面：VKSession + WebGL 画面/骨架 + 仪表 UI | ✅ **iPhone 真机验证通过** |

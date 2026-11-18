@@ -1,7 +1,7 @@
-# 小楚君机械手 · BLE 打通记录（网页端）
+# 小楚君机械手 · BLE 打通记录（网页端 + 小程序）
 
-> 目标：把本仓库的视觉端（MediaPipe 21 点 → flex 0–100）接到小楚君固件（ESP32-C3 + PCA9685 + 5×SG90）。
-> 本文覆盖**网页端**；小程序移植另开文档。
+> 目标：把本仓库的视觉端（MediaPipe / VisionKit 21 点 → flex 0–100）接到小楚君固件（ESP32-C3 + PCA9685 + 5×SG90）。
+> 网页端与小程序共用同一套指令契约与标定表，**都不需要改固件**。
 
 ## 1. 固件结构（四层）
 
@@ -44,19 +44,28 @@ BLE 标识：
 2. **上电甩手约 0.9 s**：`setup()` 统一写 0°，各指「开」位是 30/10/180/0/180。
 3. **断线无保护**：BLE 断开后停在最后姿态；`PCA9685 not found` 会死循环。
 
-## 4. 网页端实现
+## 4. 两端共用的换算
 
-### 4.1 数据流
+```
+flex ∈ [0,100]（0 = 伸直，100 = 握拳）
+angle = round(open + flex / 100 * (closed - open))，clamp 到 0–180
+```
+
+边界值（已单测）：拇指 0→30 / 100→180；中指 0→180 / 100→0；小指 0→180 / 100→35。
+
+## 5. 网页端实现
+
+### 5.1 数据流
 
 ```
 MediaPipe 21 点
   → computeFingerAngles：flex = min(100, (mcp + pip + dip) / 2.7)
-  → ble-bridge.js：angle = open + flex/100 * (closed - open)
+  → ble-bridge.js：flex → angle
   → ASCII "servo_<ch>=<angle>"（≤ 12 字节）
   → BLE 写特征（无响应写）
 ```
 
-### 4.2 `ble-bridge.js`
+### 5.2 `ble-bridge.js`
 
 全局 `window.BleHand`：
 
@@ -64,33 +73,77 @@ MediaPipe 21 点
 | --- | --- |
 | `connect()` | `requestDevice`（namePrefix `xiaochu`）→ GATT → Service → 写特征 |
 | `disconnect()` | 主动断开并清状态 |
-| `send(fingers)` | 接收 `{thumb:{flex}, ...}`；节流 10 Hz；角度变化 ≤1° 不重复写；`null` 触发全指回伸直位 |
+| `send(fingers)` | 接收 `{thumb:{flex}, ...}`；10 Hz 节流；角度变化 ≤1° 不重复写；`null` 触发全指回伸直位 |
 | `sendRaw(cmd)` | 直接写一条字符串，调试用 |
 | `setEnabled(bool)` / `isEnabled()` | 视觉驱动开关 |
 | `onStatus(cb)` / `isConnected()` | 状态回调与连接查询 |
-| `flexToAngle(finger, flex)` | 暴露换算函数 |
-| `FINGERS` | 标定表（与固件一致） |
+| `flexToAngle(finger, flex)` / `FINGERS` | 换算函数与标定表 |
 
-内部：单飞循环（`flushing`）合并高频帧，避免 30 Hz 视觉帧压垮写队列；`gattserverdisconnected` 自动清空特征并把状态置为断开。
+内部：单飞循环合并高频帧；`gattserverdisconnected` 自动清空特征并置为断开。
 
-### 4.3 页面接线
+### 5.3 页面接线
 
-- `capture.html`：MC 桥接上方新增「BLE 机械手」面板（连接/断开、视觉驱动复选框、状态、调试页入口）；`ble-bridge.js` 在 `app.js` 之前加载。
-- `app.js`：检测到手的帧（`pushBridge(angles)` 之后）调用 `BleHand.send(angles)`；丢手帧（`pushBridge(null)` 之后）调用 `BleHand.send(null)` 回伸直位；末尾 `initBlePanel()` 绑定按钮与状态。
+- `capture.html`：MC 桥接上方新增「BLE 机械手」面板；`ble-bridge.js` 在 `app.js` 之前加载。
+- `app.js`：检测帧 `pushBridge(angles)` 后调 `BleHand.send(angles)`；丢手帧调 `send(null)`；末尾 `initBlePanel()` 绑按钮与状态。
 - `ble-test.html`：不依赖摄像头的通路调试页（五指滑杆、角度直发、单条指令、日志）。
 
-## 5. 调试步骤
+## 6. 小程序实现
 
-1. 仓库根目录启动 `python -m http.server 8000`。
-2. 打开 `http://127.0.0.1:8000/ble-test.html`。
-3. 点「连接机械手」，弹窗中选 `xiaochu`。
-4. 「单条指令」发 `servo_0=90`，看拇指是否转动 → 验通道。
-5. 拖动五指滑杆，核对每根手指方向是否与滑杆一致 → 验标定。
-6. 打开 `http://127.0.0.1:8000/capture.html`，连接后在面板勾选「视觉驱动」→ 验视觉到机械手。
+### 6.1 `core/ble-hand.js`
 
-## 6. 限制与下一步
+```js
+var bleMod = require('../../core/ble-hand.js');
+this.ble = bleMod.createBleHand({ onStatus: function (text, kind) { /* ... */ } });
 
-- Web Bluetooth 仅桌面 Chrome / Edge；页面须 `localhost` 或 https。
-- 单帧 ≤ 20 字节，5 指需 5 条写入；当前 10 Hz 节流 + 变化去重。
-- 下一步（小程序）：`wx.openBluetoothAdapter` → `startBluetoothDevicesDiscovery` → `createBLEConnection` → `getBLEDeviceServices` / `getBLEDeviceCharacteristics` → `writeBLECharacteristicValue`，参数与本文契约一致。
-- 固件可选小修：按各指 `maxOpen` 上电归位、批量帧（一条 `s0,90,90,...`）、断线/超时回中位。
+this.ble.connect(function (err) { /* ... */ });  // 扫描 → 连接 → 找 Service/特征
+this.ble.setEnabled(true);
+this.ble.send(angles);     // angles[name].flex
+this.ble.send(null);       // 手离开画面
+this.ble.park();           // 强制回伸直位（关闭采集时）
+// this.ble.disconnect(); / this.ble.destroy();
+```
+
+| 方法 | 说明 |
+| --- | --- |
+| `connect(cb)` | `wx.openBluetoothAdapter` → `startBluetoothDevicesDiscovery` → 按名字匹配 `xiaochu` → `createBLEConnection` → `getBLEDeviceServices` / `getBLEDeviceCharacteristics` |
+| `disconnect(cb)` / `destroy()` | 断开连接；`destroy` 还会停扫描、关适配器 |
+| `send(angles)` | 与网页端同规则：10 Hz、变化去重、`null` 回伸直位 |
+| `sendRaw(text, cb)` | 直接写一条字符串 |
+| `park(cb)` | 不看开关，强制五指回伸直位 |
+| `setEnabled` / `isConnected` / `flexToAngle` / `FINGERS` | 同上 |
+
+与网页端的两点差异：
+
+1. **写入必须串行**：小程序 `wx.writeBLECharacteristicValue` 并发会失败，模块内置单条队列逐条写。
+2. **扫描有 20 秒超时**：超时后停止扫描并提示「未找到 xiaochu（确认设备已上电）」；UUID 匹配大小写不敏感。
+
+### 6.2 页面接线（`pages/capture`）
+
+- `data`：`bleConnected` / `bleOn` / `bleStatus`
+- 采集控制面板：`BLE 机械手` 行（连接/断开按钮）、`视觉驱动机械手` 开关（仅连接后显示）、`BLE 状态` 行
+- `onAnchors`：`track` 帧调 `pushBle(angles)`；`lost` 帧调 `pushBle(null)`
+- `stopSession`：关闭采集时 `setEnabled(false)` + `park()`，机械手回伸直位
+- 与「上行到 ORCA / 机械手」的 HTTP 桥接相互独立，可同时开启
+
+## 7. 调试步骤
+
+**网页端**
+
+1. 仓库根目录 `python -m http.server 8000`
+2. 打开 `http://127.0.0.1:8000/ble-test.html` → 点「连接机械手」→ 选 `xiaochu`
+3. 发 `servo_0=90` 看拇指 → 拖动滑杆核对方向
+4. 打开 `capture.html`，连接后勾「视觉驱动」
+
+**小程序**
+
+1. 微信开发者工具导入 `miniprogram/`，真机预览（VisionKit 需真机）
+2. 打开摄像头 → 点「BLE 机械手」的「连接」→ 状态变「已连接」
+3. 打开「视觉驱动机械手」→ 手指动作应同步到机械手
+4. 手离开画面 → 机械手应回伸直位
+
+## 8. 限制与下一步
+
+- 网页端 Web Bluetooth 仅桌面 Chrome / Edge，须 `localhost` 或 https；小程序不受此限，但 iOS 首次连接会弹系统蓝牙授权，Android 扫描通常需开启系统定位。
+- 单帧 ≤ 20 字节，5 指分 5 条写入；两端都是 10 Hz 节流 + 变化去重。
+- 固件可选小修：按各指 `maxOpen` 上电归位、批量帧（一条 `s0,90,90,...` 合并 5 指）、断线/超时回中位。
+- 真机验证未完成：小程序端目前只有模拟 `wx` API 的 Node 单测（连接流程、指令序列、去重均通过），需在 iPhone 上实测连接与跟手延迟。

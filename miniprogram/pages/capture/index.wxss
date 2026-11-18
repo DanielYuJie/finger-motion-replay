@@ -171,6 +171,18 @@
   color: var(--data);
 }
 
+/* BLE 连接按钮：嵌在行内，压到右端并与行高接近 */
+.ble-btn {
+  width: auto;
+  min-width: 120rpx;
+  height: 56rpx;
+  line-height: 56rpx;
+  margin: 0 0 0 auto;
+  padding: 0 26rpx;
+  border-radius: 12rpx;
+  font-size: 24rpx;
+}
+
 .actions { display: flex; margin-top: 24rpx; }
 .actions .btn { flex: 1; }
 .actions .btn:first-child { margin-right: 20rpx; }
